@@ -5,9 +5,9 @@
   "main": "products-data.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "download:test": "node scripts/download_images.js --mode=quick",
-    "download:all": "node scripts/download_images.js --mode=full",
-    "download:resume": "node scripts/download_images.js --mode=resume"
+    "urls:test": "node scripts/find_image_urls.js --mode=quick",
+    "urls:all": "node scripts/find_image_urls.js --mode=full",
+    "urls:resume": "node scripts/find_image_urls.js --mode=resume"
   },
   "repository": {
     "type": "git",
