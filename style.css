@@ -144,11 +144,19 @@ body {
     font-size: 1.15rem;
     font-weight: 800;
     letter-spacing: -0.4px;
-    background: linear-gradient(90deg, #fff 0%, #a3e7be 100%);
+    background: linear-gradient(90deg, var(--primary-dark), var(--primary));
     -webkit-background-clip: text;
     -webkit-text-fill-color: transparent;
     background-clip: text;
     line-height: 1.1;
+}
+
+/* Dark mode: lighter gradient for dark bg */
+[data-theme="dark"] .store-name {
+    background: linear-gradient(90deg, #fff 0%, #a3e7be 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
 }
 
 .store-tagline {
