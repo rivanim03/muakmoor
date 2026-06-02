@@ -58,7 +58,7 @@ async function searchLazada(page, productName) {
       const src = img.getAttribute('src') || '';
       const alt = (img.getAttribute('alt') || '').trim();
       if (src.includes('lazcdn.com/g/p/') && alt && alt.length > 5) {
-        found.push({ url: src.replace(/_\d+x\d+q\d+\.jpg.*$/i, '.jpg').replace(/_\d+x\d+q\d+\.png.*$/i, '.png').replace(/_\d+x\d+q\d+\.webp.*$/i, '.webp'), alt });
+        found.push({ url: src.replace(/(\.(?:jpg|jpeg|png|webp))[_.].*$/i, '$1'), alt });
       }
     });
     return found;
