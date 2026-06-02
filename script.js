@@ -500,6 +500,26 @@ function createProductCard(product) {
     return card;
 }
 
+// ===== THEME TOGGLE =====
+(function initTheme() {
+    const toggle = document.getElementById('themeToggle');
+    const icon = toggle.querySelector('i');
+    const saved = localStorage.getItem('theme') || 'light';
+
+    function setTheme(theme) {
+        document.documentElement.setAttribute('data-theme', theme);
+        icon.className = theme === 'dark' ? 'fas fa-sun' : 'fas fa-moon';
+        localStorage.setItem('theme', theme);
+    }
+
+    setTheme(saved);
+
+    toggle.addEventListener('click', () => {
+        const current = document.documentElement.getAttribute('data-theme') || 'light';
+        setTheme(current === 'dark' ? 'light' : 'dark');
+    });
+})();
+
 // ===== INIT =====
 loadCategories();
 renderProducts();
