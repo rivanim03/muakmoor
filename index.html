@@ -3,21 +3,28 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Makmur Grosir - Toko Online</title>
+    <title>Makmur Grosir - Toko Grosir Online</title>
+    <meta name="description" content="Makmur Grosir – belanja kebutuhan grosir harga murah dan terpercaya, checkout mudah via WhatsApp.">
     <link rel="stylesheet" href="style.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
 </head>
 <body>
+
     <!-- Header -->
     <header class="header">
         <div class="header-content">
-            <h1 class="store-name">Makmur Grosir</h1>
-            <p class="store-tagline">Grosir Murah & Terpercaya</p>
+            <div class="header-logo">🛒</div>
+            <div class="header-text">
+                <h1 class="store-name">Makmur Grosir</h1>
+                <p class="store-tagline">Grosir Murah &amp; Terpercaya</p>
+            </div>
         </div>
-        <button class="cart-btn" id="cartBtn" aria-label="Keranjang">
-            <i class="fas fa-shopping-cart"></i>
-            <span class="cart-badge" id="cartBadge">0</span>
-        </button>
+        <div class="header-actions">
+            <button class="cart-btn" id="cartBtn" aria-label="Keranjang Belanja">
+                <i class="fas fa-shopping-cart"></i>
+                <span class="cart-badge" id="cartBadge">0</span>
+            </button>
+        </div>
     </header>
 
     <!-- Search Bar -->
@@ -42,12 +49,16 @@
         </div>
     </main>
 
-    <!-- Cart Sidebar / Overlay -->
+    <!-- Cart Overlay -->
     <div class="cart-overlay" id="cartOverlay"></div>
+
+    <!-- Cart Sidebar -->
     <div class="cart-sidebar" id="cartSidebar">
         <div class="cart-header">
             <h2><i class="fas fa-shopping-cart"></i> Keranjang</h2>
-            <button class="close-cart" id="closeCart"><i class="fas fa-times"></i></button>
+            <button class="close-cart" id="closeCart" aria-label="Tutup keranjang">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
         <div class="cart-items" id="cartItems">
             <div class="cart-empty">
@@ -57,7 +68,7 @@
         </div>
         <div class="cart-footer" id="cartFooter" style="display:none;">
             <div class="cart-total">
-                <span>Total</span>
+                <span>Total Belanja</span>
                 <span class="total-price" id="totalPrice">Rp 0</span>
             </div>
             <button class="checkout-btn" id="checkoutBtn">

@@ -2,14 +2,12 @@
  * ============================================================
  * MAKMUR GROSIR - PRODUCT IMAGE DOWNLOADER
  * ============================================================
- * Mencari gambar ASLI produk dari internet via Bing Images
- * menggunakan Playwright.
- * 
- * CARA PAKAI:
- *   node scripts/download_images.js --mode=quick    (test 10)
- *   node scripts/download_images.js --mode=full     (semua)
- *   node scripts/download_images.js --mode=resume   (ulang gagal)
- * ============================================================
+ * Strategy: Lazada (primary) -> Shopee -> Tokopedia -> Bing
+ * Lazada has real product photos indexed from Indonesian sellers.
+ *
+ * npm run download:test   (10 products)
+ * npm run download:all    (all 2,781)
+ * npm run download:resume (retry failed)
  */
 
 const fs = require('fs');
@@ -18,200 +16,268 @@ const https = require('https');
 const http = require('http');
 const XLSX = require('xlsx');
 
-const CONFIG = {
-  excelPath: path.join(__dirname, '..', 'Daftar Produk.xlsx'),
-  outputDir: path.join(__dirname, '..', 'assets', 'images'),
-  delayBetweenDownloads: 2000,
-  downloadTimeout: 30000,
+const CFG = {
+  excel: path.join(__dirname, '..', 'Daftar Produk.xlsx'),
+  out: path.join(__dirname, '..', 'assets', 'images'),
+  delay: 2000,
+  timeout: 25000,
   mode: process.argv.find(a => a.startsWith('--mode='))?.split('=')[1] || 'full',
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
-const sanitize = name => name.toLowerCase().replace(/[^a-z0-9]/g, '_').replace(/_+/g, '_').replace(/^_|_$/g, '').substring(0, 80);
-const getFilename = (id, name) => `${id}_${sanitize(name)}.jpg`;
+const san = n => n.toLowerCase().replace(/[^a-z0-9]/g,'_').replace(/_+/g,'_').replace(/^_|_$/g,'').substring(0,80);
+const fname = (id,n) => `${id}_${san(n)}.jpg`;
 
 // ===== DOWNLOAD FILE =====
-function downloadFile(url, destPath) {
+function dl(url, dest) {
   return new Promise((resolve, reject) => {
-    const protocol = url.startsWith('https') ? https : http;
-    const timeout = setTimeout(() => { req.destroy(); reject(new Error('Timeout')); }, CONFIG.downloadTimeout);
-    const headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-    'Accept': 'image/webp,image/apng,image/*,*/*;q=0.8',
-    'Referer': 'https://www.bing.com/'
-  };
-  const req = protocol.get(url, { headers }, (res) => {
-    let redirects = 0;
-    const handle = (response) => {
-      if (response.statusCode >= 300 && response.statusCode < 400 && response.headers.location) {
-        if (redirects++ > 3) { clearTimeout(timeout); reject(new Error('Too many redirects')); return; }
-        const u = response.headers.location.startsWith('http') ? response.headers.location : new URL(response.headers.location, url).href;
-        const proto = u.startsWith('https') ? https : http;
-        const r = proto.get(u, { headers }, handle);
-        r.on('error', e => { clearTimeout(timeout); reject(e); }); r.end();
-        return;
-      }
-      if (response.statusCode !== 200) { clearTimeout(timeout); reject(new Error(`HTTP ${response.statusCode}`)); return; }
-      const ct = response.headers['content-type'] || '';
-      if (!ct.startsWith('image/')) { clearTimeout(timeout); reject(new Error(`Not image: ${ct}`)); return; }
-      const file = fs.createWriteStream(destPath);
-      response.pipe(file);
-      file.on('finish', () => {
-        clearTimeout(timeout); file.close();
-        const stats = fs.statSync(destPath);
-        if (stats.size < 200) { fs.unlinkSync(destPath); reject(new Error(`Too small: ${stats.size}b`)); }
-        else resolve(destPath);
-      });
-      file.on('error', err => { clearTimeout(timeout); try { fs.unlinkSync(destPath); } catch(e){} reject(err); });
+    const proto = url.startsWith('https') ? https : http;
+    const t = setTimeout(() => { req.destroy(); reject(new Error('Timeout')); }, CFG.timeout);
+    const h = {
+      'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+      'Accept': 'image/webp,image/*,*/*;q=0.8',
+      'Referer': 'https://www.lazada.co.id/'
     };
-    handle(res);
-  });
-    req.on('error', err => { clearTimeout(timeout); reject(err); });
-    req.end();
+    const req = proto.get(url, { headers: h }, (res) => {
+      let r = 0;
+      const go = (resp) => {
+        if (resp.statusCode >= 300 && resp.statusCode < 400 && resp.headers.location) {
+          if (r++ > 3) { clearTimeout(t); reject(new Error('Redirects')); return; }
+          const u = resp.headers.location.startsWith('http') ? resp.headers.location : new URL(resp.headers.location, url).href;
+          const p = (u.startsWith('https') ? https : http).get(u, { headers: h }, go);
+          p.on('error', e => { clearTimeout(t); reject(e); }); p.end(); return;
+        }
+        if (resp.statusCode !== 200) { clearTimeout(t); reject(new Error(`HTTP ${resp.statusCode}`)); return; }
+        const ct = resp.headers['content-type'] || '';
+        if (!ct.startsWith('image/')) { clearTimeout(t); reject(new Error('Not image')); return; }
+        const f = fs.createWriteStream(dest);
+        resp.pipe(f);
+        f.on('finish', () => {
+          clearTimeout(t); f.close();
+          if (fs.statSync(dest).size < 500) { fs.unlinkSync(dest); reject(new Error('Small')); }
+          else resolve(dest);
+        });
+        f.on('error', e => { clearTimeout(t); try { fs.unlinkSync(dest); } catch(x) {} reject(e); });
+      };
+      go(res);
+    });
+    req.on('error', e => { clearTimeout(t); reject(e); }); req.end();
   });
 }
 
-// ===== BACA EXCEL =====
-function readProducts() {
-  console.log('📖 Membaca file Excel...');
-  const wb = XLSX.readFile(CONFIG.excelPath);
+// ===== READ EXCEL =====
+function readExcel() {
+  console.log('📖 Reading Excel...');
+  const wb = XLSX.readFile(CFG.excel);
   const ws = wb.Sheets['Sheet'];
   const data = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
-  const products = [];
+  const out = [];
   for (let i = 1; i < data.length; i++) {
-    const name = (data[i][1] || '').trim();
-    if (!name) continue;
-    if (!products.find(p => p.name.toUpperCase() === name.toUpperCase())) {
-      products.push({ id: products.length + 1, name });
-    }
+    const n = (data[i][1] || '').trim();
+    if (!n || out.find(x => x.name.toUpperCase() === n.toUpperCase())) continue;
+    out.push({ id: out.length + 1, name: n });
   }
-  console.log(`✅ ${products.length} produk ditemukan\n`);
-  return products;
+  console.log(`✅ ${out.length} products\n`);
+  return out;
 }
 
-// ===== BING IMAGES SEARCH =====
-async function findImageOnBing(page, productName) {
-  const query = encodeURIComponent(productName);
-  console.log(`   🔍 Bing: "${productName}"`);
+// ===== MATCH SCORE: how well does image alt text match product name? =====
+function matchScore(productName, altText) {
+  const p = productName.toLowerCase();
+  const a = altText.toLowerCase();
+  // Count matching words
+  const pWords = p.split(/\s+/).filter(w => w.length > 1);
+  const aWords = a.split(/\s+/).filter(w => w.length > 1);
+  let matches = 0;
+  for (const pw of pWords) {
+    if (a.includes(pw)) matches++;
+  }
+  return matches;
+}
 
-  await page.goto(`https://www.bing.com/images/search?q=${query}`, {
-    waitUntil: 'domcontentloaded', timeout: 25000
-  }).catch(() => {});
-  await sleep(3000);
-
-  // Accept cookies
+// ===== LAZADA SEARCH =====
+async function searchLazada(page, productName) {
+  console.log(`   🛍️  Lazada...`);
+  const q = encodeURIComponent(productName);
   try {
-    const btn = page.locator('#bnp_btn_accept, button[name="accept"]').first();
-    if (await btn.isVisible({ timeout: 2000 }).catch(() => false)) { await btn.click(); await sleep(1000); }
-  } catch(e) {}
+    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
+      waitUntil: 'networkidle', timeout: 20000
+    });
+  } catch (e) {
+    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
+      waitUntil: 'domcontentloaded', timeout: 15000
+    }).catch(() => {});
+  }
+  await sleep(4000);
 
-  // Scroll
-  await page.evaluate(() => window.scrollBy(0, 500));
-  await sleep(1000);
-
-  // Extract image URLs from the page
   const results = await page.evaluate(() => {
-    const urls = [];
-    // Bing puts image data in "m" attribute (JSON) of anchor tags
-    document.querySelectorAll('a.iusc, a[href*="/images/search"]').forEach(a => {
-      const m = a.getAttribute('m');
-      if (m) {
-        try {
-          const data = JSON.parse(m);
-          if (data.murl) urls.push(data.murl);
-        } catch(e) {}
+    const found = [];
+    document.querySelectorAll('img[src*="http"]').forEach(img => {
+      const src = img.getAttribute('src') || '';
+      const alt = (img.getAttribute('alt') || '').trim();
+      // Only product photos: lazcdn.com/g/p/ (not /tps/ or /domino/ UI elements)
+      if (src.includes('lazcdn.com/g/p/') && alt && alt.length > 5) {
+        found.push({
+          src: src.replace(/_\d+x\d+q\d+/, ''),  // strip size suffix for full res
+          alt: alt,
+        });
       }
     });
-    // Also check img tags directly
-    if (urls.length === 0) {
-      document.querySelectorAll('img.mimg, img[src*="http"]').forEach(img => {
-        const src = img.getAttribute('src');
-        if (src && src.startsWith('http') && !src.includes('bing.com') && src.match(/\.(jpg|jpeg|png|webp)/i)) {
-          urls.push(src);
+    return found;
+  });
+
+  if (results.length > 0) {
+    // Score by alt text match
+    results.forEach(r => { r.score = matchScore(productName, r.alt); });
+    results.sort((a, b) => b.score - a.score);
+  }
+
+  return results;
+}
+
+// ===== TOKOPEDIA SEARCH =====
+async function searchTokopedia(page, productName) {
+  console.log(`   🛒 Tokopedia...`);
+  const q = encodeURIComponent(productName);
+  try {
+    await page.goto(`https://www.tokopedia.com/search?q=${q}`, {
+      waitUntil: 'domcontentloaded', timeout: 15000
+    });
+    await sleep(4000);
+
+    return await page.evaluate(() => {
+      const found = [];
+      document.querySelectorAll('img[src*="tokopedia"], img[src*="tkpcdn"]').forEach(img => {
+        const src = img.getAttribute('src') || '';
+        if (src && src.startsWith('http') && src.match(/\.(jpg|jpeg|png|webp)/i)) {
+          found.push({ src: src, alt: img.getAttribute('alt') || '', score: 0 });
         }
       });
-    }
-    return urls;
-  });
-
-  return results.length > 0 ? results[0] : null;
+      return found;
+    });
+  } catch (e) { return []; }
 }
 
-// ===== DUCKDUCKGO SEARCH =====
-async function findImageOnDDG(page, productName) {
-  const query = encodeURIComponent(productName);
-  console.log(`   🔍 DDG: "${productName}"`);
+// ===== BING FALLBACK =====
+async function searchBing(page, productName) {
+  console.log(`   🔍 Bing (fallback)...`);
+  const q = encodeURIComponent(productName + ' lazada');
+  try {
+    await page.goto(`https://www.bing.com/images/search?q=${q}`, {
+      waitUntil: 'domcontentloaded', timeout: 15000
+    });
+    await sleep(2000);
+    // Cookie
+    try {
+      const btn = page.locator('#bnp_btn_accept, button[name="accept"]').first();
+      if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) { await btn.click(); await sleep(300); }
+    } catch(e) {}
 
-  await page.goto(`https://duckduckgo.com/?q=${query}&iax=images&ia=images`, {
-    waitUntil: 'domcontentloaded', timeout: 20000
-  }).catch(() => {});
-  await sleep(3000);
+    await page.evaluate(() => window.scrollBy(0, 400));
+    await sleep(500);
 
-  return await page.evaluate(() => {
-    const links = document.querySelectorAll('a[data-gid] img, .tile--img img, img[src*="http"]');
-    for (const img of links) {
-      const src = img.getAttribute('src') || img.getAttribute('data-src');
-      if (src && src.startsWith('http') && !src.includes('duckduckgo.com') && src.match(/\.(jpg|jpeg|png|webp)/i)) return src;
-    }
-    return null;
-  });
+    return await page.evaluate(() => {
+      const found = [];
+      document.querySelectorAll('a.iusc').forEach(a => {
+        const m = a.getAttribute('m');
+        if (m) {
+          try {
+            const d = JSON.parse(m);
+            if (d.murl && d.murl.match(/\.(jpg|jpeg|png|webp)/i)) {
+              // Filter out obvious junk
+              const url = d.murl;
+              if (!/clipart|painting|illust|wallpaper|logo|icon|vector/i.test(url)) {
+                found.push({ src: url, alt: d.t || '', score: 0 });
+              }
+            }
+          } catch(e) {}
+        }
+      });
+      return found.slice(0, 5);
+    });
+  } catch (e) { return []; }
 }
 
-// ===== DOWNLOAD 1 PRODUK =====
-async function downloadOneProduct(page, product) {
+// ===== DOWNLOAD ONE PRODUCT =====
+async function downloadOne(page, product) {
   const { id, name } = product;
-  const filePath = path.join(CONFIG.outputDir, getFilename(id, name));
-  if (fs.existsSync(filePath)) return { status: 'exists' };
+  const fp = path.join(CFG.out, fname(id, name));
+  if (fs.existsSync(fp)) return { status: 'exists' };
 
   console.log(`\n📦 [${id}] ${name}`);
 
-  let imgUrl = null;
-  try { imgUrl = await findImageOnBing(page, name); } catch(e) { console.log(`   ⚠️ ${e.message}`); }
-  if (!imgUrl) { try { imgUrl = await findImageOnDDG(page, name); } catch(e) {} }
+  let candidates = [];
 
-  if (imgUrl) {
-    console.log(`   ⬇️ ${imgUrl.substring(0, 90)}...`);
-    try { await downloadFile(imgUrl, filePath); console.log(`   ✅ BERHASIL!`); return { status: 'downloaded', file: filePath }; }
-    catch(err) {
-      console.log(`   ❌ ${err.message}`);
-      const clean = imgUrl.split('?')[0];
-      if (clean !== imgUrl) { try { await downloadFile(clean, filePath); console.log(`   ✅ BERHASIL!`); return { status: 'downloaded', file: filePath }; } catch(e) {} }
+  // Priority 1: Lazada (best source - real product images)
+  try { candidates = await searchLazada(page, name); } catch(e) {}
+  console.log(`   Found ${candidates.length} Lazada matches`);
+
+  // Priority 2: Tokopedia
+  if (candidates.length === 0) {
+    try { candidates = await searchTokopedia(page, name); } catch(e) {}
+    console.log(`   Found ${candidates.length} Tokopedia matches`);
+  }
+
+  // Priority 3: Bing
+  if (candidates.length === 0) {
+    try { candidates = await searchBing(page, name); } catch(e) {}
+    console.log(`   Found ${candidates.length} Bing matches`);
+  }
+
+  if (candidates.length === 0) {
+    console.log(`   ❌ No results`);
+    return { status: 'failed' };
+  }
+
+  // Try each candidate
+  for (let i = 0; i < Math.min(candidates.length, 5); i++) {
+    const c = candidates[i];
+    console.log(`   ⬇️ [${i+1}] ${c.src.substring(0, 80)}...`);
+    try {
+      await dl(c.src, fp);
+      console.log(`   ✅ SAVED!`);
+      return { status: 'downloaded', file: fp };
+    } catch(e) {
+      // Try stripping size suffix for bigger image
+      const clean = c.src.split('?')[0];
+      if (clean !== c.src) {
+        try { await dl(clean, fp); console.log(`   ✅ SAVED!`); return { status: 'downloaded', file: fp }; } catch(x) {}
+      }
     }
-  } else console.log(`   ❌ Tidak ada`);
-
+  }
+  console.log(`   ❌ All failed`);
   return { status: 'failed' };
 }
 
 // ===== GENERATE image-mapping.js =====
-function generateJs(mapping) {
-  fs.writeFileSync(path.join(CONFIG.outputDir, 'image-mapping.js'),
-    `const productImages = ${JSON.stringify(mapping, null, 2)};
-function getProductImage(id) { const e = productImages[id]; return e && e.file ? e.file : null; }
-function getImageStatus(id) { const e = productImages[id]; return e ? e.status : 'missing'; }`, 'utf-8');
+function genJs(m) {
+  fs.writeFileSync(path.join(CFG.out, 'image-mapping.js'),
+    `const productImages=${JSON.stringify(m, null, 2)};
+function getProductImage(id){const e=productImages[id];return e&&e.file?e.file:null;}
+function getImageStatus(id){const e=productImages[id];return e?e.status:'missing';}`, 'utf-8');
 }
 
 // ===== MAIN =====
 async function main() {
-  console.log('╔══════════════════════════════════════════════════╗');
-  console.log('║   🌐 MAKMUR GROSIR - IMAGE DOWNLOADER          ║');
-  console.log('║   (Playwright + Bing Images)                   ║');
-  console.log('╚══════════════════════════════════════════════════╝\n');
+  console.log('╔════════════════════════════════════════╗');
+  console.log('║  🌐 IMAGE DOWNLOADER — Lazada First  ║');
+  console.log('╚════════════════════════════════════════╝\n');
 
-  const allProducts = readProducts();
-  let products = [...allProducts];
-  if (CONFIG.mode === 'quick') products = products.slice(0, 10);
-  else if (CONFIG.mode === 'resume') {
-    const p = path.join(CONFIG.outputDir, '_failed.json');
-    if (fs.existsSync(p)) products = JSON.parse(fs.readFileSync(p, 'utf-8')).map(f => allProducts.find(x => x.id === f.id)).filter(Boolean);
+  const all = readExcel();
+  let prods = [...all];
+  if (CFG.mode === 'quick') prods = prods.slice(0, 10);
+  else if (CFG.mode === 'resume') {
+    const p = path.join(CFG.out, '_failed.json');
+    if (fs.existsSync(p)) prods = JSON.parse(fs.readFileSync(p, 'utf-8')).map(f => all.find(x => x.id === f.id)).filter(Boolean);
   }
-  console.log(`${CONFIG.mode === 'quick' ? '⚡ Quick: 10 produk' : CONFIG.mode === 'resume' ? '🔄 Resume: '+products.length : '🔥 Full: '+products.length+' produk'}\n`);
+  console.log(`${CFG.mode === 'quick' ? '⚡ Quick: 10' : CFG.mode === 'resume' ? '🔄 Resume: ' + prods.length : '🔥 Full: ' + prods.length}\n`);
 
-  if (!fs.existsSync(CONFIG.outputDir)) fs.mkdirSync(CONFIG.outputDir, { recursive: true });
+  if (!fs.existsSync(CFG.out)) fs.mkdirSync(CFG.out, { recursive: true });
 
-  const mappingPath = path.join(CONFIG.outputDir, '_mapping.json');
-  let mapping = fs.existsSync(mappingPath) ? JSON.parse(fs.readFileSync(mappingPath, 'utf-8')) : {};
-  const failedPath = path.join(CONFIG.outputDir, '_failed.json');
-  let failedList = fs.existsSync(failedPath) ? JSON.parse(fs.readFileSync(failedPath, 'utf-8')) : [];
+  const mp = path.join(CFG.out, '_mapping.json');
+  let m = fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, 'utf-8')) : {};
+  const fp = path.join(CFG.out, '_failed.json');
+  let fl = fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, 'utf-8')) : [];
 
   console.log('🚀 Launching Playwright...');
   const { chromium } = require('playwright');
@@ -220,25 +286,32 @@ async function main() {
   console.log('✅ Ready!\n');
 
   let ok = 0, fail = 0;
-  for (let i = 0; i < products.length; i++) {
-    const p = products[i];
-    if (mapping[p.id] && mapping[p.id].file) { process.stdout.write(`\r⏭️  ${i+1}/${products.length}`); continue; }
-    const r = await downloadOneProduct(page, p);
-    if (r.status === 'downloaded') { mapping[p.id] = { name: p.name, file: `assets/images/${getFilename(p.id, p.name)}`, status: 'downloaded' }; ok++; }
-    else { fail++; failedList.push({ id: p.id, name: p.name }); mapping[p.id] = { name: p.name, file: null, status: 'failed' }; }
-    process.stdout.write(`\r📊 ${i+1}/${products.length} | ✅ ${ok} | ❌ ${fail}`);
-    if (i < products.length - 1) await sleep(CONFIG.delayBetweenDownloads);
+  for (let i = 0; i < prods.length; i++) {
+    const p = prods[i];
+    if (m[p.id] && m[p.id].file) {
+      process.stdout.write(`\r⏭️  ${i+1}/${prods.length} ${p.name}`);
+      continue;
+    }
+    const r = await downloadOne(page, p);
+    if (r.status === 'downloaded') {
+      m[p.id] = { name: p.name, file: `assets/images/${fname(p.id, p.name)}`, status: 'downloaded' };
+      ok++;
+    } else {
+      fail++;
+      fl.push({ id: p.id, name: p.name });
+      m[p.id] = { name: p.name, file: null, status: 'failed' };
+    }
+    process.stdout.write(`\r📊 ${i+1}/${prods.length} | ✅ ${ok} | ❌ ${fail}`);
+    if (i < prods.length - 1) await sleep(CFG.delay);
   }
 
   await browser.close();
-  fs.writeFileSync(mappingPath, JSON.stringify(mapping, null, 2), 'utf-8');
-  if (fail > 0) fs.writeFileSync(failedPath, JSON.stringify(failedList, null, 2), 'utf-8');
-  generateJs(mapping);
-
-  console.log(`\n\n✅ ${ok} berhasil, ❌ ${fail} gagal`);
-  if (CONFIG.mode === 'quick') console.log(`\n🔥 Full: node scripts/download_images.js --mode=full`);
-  if (fail > 0) console.log(`💡 Resume: node scripts/download_images.js --mode=resume`);
-  console.log();
+  fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
+  if (fail > 0) fs.writeFileSync(fp, JSON.stringify(fl, null, 2), 'utf-8');
+  genJs(m);
+  console.log(`\n\n✅ ${ok} done | ❌ ${fail} failed`);
+  if (CFG.mode === 'quick') console.log(`\n🔥 Full: node scripts/download_images.js --mode=full`);
+  if (fail > 0) console.log(`💡 Retry: node scripts/download_images.js --mode=resume\n`);
 }
 
 main().catch(err => { console.error('\n❌ Fatal:', err); process.exit(1); });
