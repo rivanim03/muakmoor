@@ -1,0 +1,7 @@
+node_modules/
+DataBaseFormxlsx/node_modules/
+DataBaseFormxlsx/generate_template.js
+DataBaseFormxlsx/package.json
+DataBaseFormxlsx/package-lock.json
+.DS_Store
+Thumbs.db
