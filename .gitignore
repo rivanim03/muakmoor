@@ -12,5 +12,10 @@ Thumbs.db
 # Environment
 .env
 
-# Downloaded image data (regenerate with scripts)
+# Downloaded images & generated data (run Download Gambar Produk.bat)
+assets/images/*.jpg
+assets/images/*.svg
+assets/images/*.png
+assets/images/_mapping.json
 assets/images/_failed.json
+assets/images/image-mapping.js

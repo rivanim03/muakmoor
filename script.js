@@ -5,6 +5,8 @@
 let cart = [];
 let currentCategory = 'all';
 let searchQuery = '';
+let currentPage = 1;
+const PAGE_SIZE = 24; // Show 24 products per page (12 rows × 2 columns)
 
 // ===== DOM ELEMENTS =====
 const productsGrid = document.getElementById('productsGrid');
@@ -35,6 +37,7 @@ function loadCategories() {
             document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
             semuaBtn.classList.add('active');
             currentCategory = 'all';
+            currentPage = 1;
             renderProducts();
         });
     }
@@ -48,6 +51,7 @@ function loadCategories() {
             document.querySelectorAll('.category-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             currentCategory = cat;
+            currentPage = 1;
             renderProducts();
         });
         categoriesContainer.appendChild(btn);
@@ -66,50 +70,104 @@ function getCartStatusText(productId) {
     return `${totalQty} di keranjang`;
 }
 
-// ===== RENDER PRODUK (DOM manipulation, lebih cepat dari innerHTML) =====
-let cancelBatch = false;
-
-function renderProducts() {
-    const filtered = products.filter(p => {
+// ===== RENDER PRODUK with Pagination =====
+function getFilteredProducts() {
+    return products.filter(p => {
         const matchCategory = currentCategory === 'all' || p.category === currentCategory;
         const matchSearch = p.name.toLowerCase().includes(searchQuery.toLowerCase());
         return matchCategory && matchSearch;
     });
+}
+
+function renderProducts() {
+    const filtered = getFilteredProducts();
 
     if (filtered.length === 0) {
         productsGrid.innerHTML = `
-            <div class="no-results">
+            <div class="no-results" style="grid-column: 1 / -1;">
                 <i class="fas fa-search"></i>
                 <p>Tidak ada produk ditemukan</p>
-            </div>
-        `;
+            </div>`;
+        document.getElementById('loadMoreContainer').style.display = 'none';
         return;
     }
 
-    cancelBatch = true; // Batalkan batch sebelumnya
+    // Calculate pagination
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+    // Render current page
     productsGrid.innerHTML = '';
-    let index = 0;
-    const batchSize = 80;
+    const fragment = document.createDocumentFragment();
+    for (const product of pageItems) {
+        fragment.appendChild(createProductCard(product));
+    }
+    productsGrid.appendChild(fragment);
 
-    function renderNextBatch() {
-        if (cancelBatch) return; // Dibatalkan karena render baru
-        const fragment = document.createDocumentFragment();
-        const batch = filtered.slice(index, index + batchSize);
+    // Update load more / pagination UI
+    renderPagination(filtered.length, currentPage, totalPages);
+}
 
-        for (const product of batch) {
-            fragment.appendChild(createProductCard(product));
-        }
-
-        productsGrid.appendChild(fragment);
-        index += batchSize;
-
-        if (index < filtered.length) {
-            setTimeout(renderNextBatch, 8);
-        }
+function renderPagination(totalItems, page, totalPages) {
+    const loadMoreContainer = document.getElementById('loadMoreContainer');
+    
+    if (totalPages <= 1) {
+        loadMoreContainer.style.display = 'none';
+        return;
     }
 
-    cancelBatch = false;
-    renderNextBatch();
+    loadMoreContainer.style.display = 'flex';
+    const showingEnd = Math.min(page * PAGE_SIZE, totalItems);
+
+    loadMoreContainer.innerHTML = `
+        <div class="pagination-info">
+            Menampilkan ${(page-1)*PAGE_SIZE + 1}–${showingEnd} dari ${totalItems} produk
+        </div>
+        <div class="pagination-btns">
+            <button class="page-btn" onclick="goToPage(1)" ${page === 1 ? 'disabled' : ''}>
+                <i class="fas fa-angle-double-left"></i>
+            </button>
+            <button class="page-btn" onclick="goToPage(${page - 1})" ${page === 1 ? 'disabled' : ''}>
+                <i class="fas fa-angle-left"></i>
+            </button>
+            <span class="page-indicator">${page} / ${totalPages}</span>
+            <button class="page-btn" onclick="goToPage(${page + 1})" ${page === totalPages ? 'disabled' : ''}>
+                <i class="fas fa-angle-right"></i>
+            </button>
+            <button class="page-btn" onclick="goToPage(${totalPages})" ${page === totalPages ? 'disabled' : ''}>
+                <i class="fas fa-angle-double-right"></i>
+            </button>
+            <button class="page-btn load-more-btn" onclick="loadMore()" ${page === totalPages ? 'disabled' : ''}>
+                + Load More
+            </button>
+        </div>`;
+}
+
+function goToPage(page) {
+    currentPage = Math.max(1, page);
+    renderProducts();
+    // Scroll to top of grid
+    productsGrid.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function loadMore() {
+    currentPage++;
+    const filtered = getFilteredProducts();
+    const totalPages = Math.ceil(filtered.length / PAGE_SIZE);
+    if (currentPage > totalPages) currentPage = totalPages;
+    const start = (currentPage - 1) * PAGE_SIZE;
+    const pageItems = filtered.slice(start, start + PAGE_SIZE);
+
+    const fragment = document.createDocumentFragment();
+    for (const product of pageItems) {
+        fragment.appendChild(createProductCard(product));
+    }
+    productsGrid.appendChild(fragment);
+
+    renderPagination(filtered.length, currentPage, totalPages);
+    document.querySelector('.load-more-btn')?.scrollIntoView({ behavior: 'smooth' });
 }
 
 // ===== UPDATE SATU KARTU PRODUK (tanpa render ulang semua) =====
@@ -340,7 +398,7 @@ closeCart.addEventListener('click', closeCartSidebar);
 cartOverlay.addEventListener('click', closeCartSidebar);
 
 // Search — debounce biar tidak render ulang setiap ketikan
-const debouncedSearch = debounce(() => renderProducts(), 300);
+const debouncedSearch = debounce(() => { currentPage = 1; renderProducts(); }, 300);
 searchInput.addEventListener('input', (e) => {
     searchQuery = e.target.value;
     debouncedSearch();
