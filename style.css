@@ -310,8 +310,10 @@ body {
 .product-card {
     background: var(--bg-surface);
     border: 1px solid var(--border);
-    border-radius: var(--radius);
+    border-radius: var(--radius-lg);
     overflow: hidden;
+    display: flex;
+    flex-direction: column;
     cursor: pointer;
     transition: all var(--transition);
     animation: cardIn 0.35s ease both;
@@ -405,6 +407,7 @@ body {
     display: flex;
     flex-direction: column;
     gap: 6px;
+    flex: 1;
 }
 
 .product-name {
@@ -416,6 +419,7 @@ body {
     -webkit-line-clamp: 2;
     -webkit-box-orient: vertical;
     overflow: hidden;
+    min-height: calc(0.82rem * 1.35 * 2); /* 2-line minimum to align across cards */
 }
 
 .product-price {
@@ -434,7 +438,15 @@ body {
 /* ===== VARIANT SELECTOR ===== */
 .variant-selector,
 .variant-spacer {
-    min-height: 32px;
+    height: 32px; /* exact match, not min-height */
+}
+
+.variant-selector {
+    /* container doesn't need padding, select handles it */
+}
+
+.variant-spacer {
+    visibility: hidden; /* invisible but takes same space */
 }
 
 .variant-select {
