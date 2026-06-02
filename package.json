@@ -1,0 +1,28 @@
+{
+  "name": "muakmoor",
+  "version": "1.0.0",
+  "description": "",
+  "main": "products-data.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "download:test": "node scripts/download_images.js --mode=quick",
+    "download:all": "node scripts/download_images.js --mode=full",
+    "download:resume": "node scripts/download_images.js --mode=resume"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/rivanim03/muakmoor.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/rivanim03/muakmoor/issues"
+  },
+  "homepage": "https://github.com/rivanim03/muakmoor#readme",
+  "dependencies": {
+    "playwright": "^1.60.0",
+    "xlsx": "^0.18.5"
+  }
+}

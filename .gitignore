@@ -5,3 +5,12 @@ DataBaseFormxlsx/package.json
 DataBaseFormxlsx/package-lock.json
 .DS_Store
 Thumbs.db
+
+# Temp Excel files
+~$*.xlsx
+
+# Environment
+.env
+
+# Downloaded image data (regenerate with scripts)
+assets/images/_failed.json

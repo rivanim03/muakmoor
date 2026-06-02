@@ -242,9 +242,14 @@ function updateCart() {
 
     cartFooter.style.display = 'block';
 
-    cartItems.innerHTML = cart.map(item => `
+    cartItems.innerHTML = cart.map(item => {
+        const imgPath = typeof getProductImage === 'function' ? getProductImage(item.productId) : null;
+        const imgHtml = imgPath
+            ? `<img src="${imgPath}" alt="${item.name}" class="cart-item-thumb" onerror="this.style.display='none'">`
+            : `<span class="cart-item-icon">${item.icon}</span>`;
+        return `
         <div class="cart-item">
-            <div class="cart-item-image">${item.icon}</div>
+            <div class="cart-item-image">${imgHtml}</div>
             <div class="cart-item-info">
                 <div class="cart-item-name">${item.name}</div>
                 <div class="cart-item-unit">${item.unit}</div>
@@ -258,8 +263,8 @@ function updateCart() {
                     <i class="fas fa-trash-alt"></i>
                 </button>
             </div>
-        </div>
-    `).join('');
+        </div>`;
+    }).join('');
 
     // Update total
     const total = cart.reduce((sum, item) => sum + (item.price * item.qty), 0);
@@ -355,7 +360,28 @@ function createProductCard(product) {
 
     const imageDiv = document.createElement('div');
     imageDiv.className = 'product-image';
-    imageDiv.textContent = product.icon;
+    
+    // Try to load actual product image
+    const imgPath = typeof getProductImage === 'function' ? getProductImage(product.id) : null;
+    if (imgPath) {
+        const img = document.createElement('img');
+        img.className = 'product-img';
+        img.src = imgPath;
+        img.alt = product.name;
+        img.loading = 'lazy';
+        img.onerror = function() {
+            // Fallback to emoji on error
+            this.style.display = 'none';
+            const fallback = document.createElement('span');
+            fallback.className = 'product-img-fallback';
+            fallback.textContent = product.icon;
+            imageDiv.appendChild(fallback);
+        };
+        imageDiv.appendChild(img);
+    } else {
+        imageDiv.textContent = product.icon;
+    }
+    
     if (inCart) {
         const badge = document.createElement('div');
         badge.className = 'in-cart-badge';
