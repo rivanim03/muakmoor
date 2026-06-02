@@ -18,4 +18,5 @@ assets/images/*.svg
 assets/images/*.png
 assets/images/_mapping.json
 assets/images/_failed.json
+# image-mapping.js is tracked — starts as stub, populated by downloader
 assets/images/image-mapping.js
