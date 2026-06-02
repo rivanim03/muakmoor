@@ -6,7 +6,7 @@ let cart = [];
 let currentCategory = 'all';
 let searchQuery = '';
 let currentPage = 1;
-const PAGE_SIZE = 24; // Show 24 products per page (12 rows × 2 columns)
+const PAGE_SIZE = 30; // 30 per page (iterations of 5)
 
 // ===== DOM ELEMENTS =====
 const productsGrid = document.getElementById('productsGrid');
@@ -479,6 +479,11 @@ function createProductCard(product) {
         });
         variantDiv.appendChild(select);
         infoDiv.appendChild(variantDiv);
+    } else {
+        // Spacer untuk menyamakan posisi tombol antar kartu
+        const spacer = document.createElement('div');
+        spacer.className = 'variant-spacer';
+        infoDiv.appendChild(spacer);
     }
 
     const btn = document.createElement('button');

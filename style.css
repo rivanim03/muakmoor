@@ -432,8 +432,9 @@ body {
 }
 
 /* ===== VARIANT SELECTOR ===== */
-.variant-selector {
-    /* no extra margin, gap handles spacing */
+.variant-selector,
+.variant-spacer {
+    min-height: 32px;
 }
 
 .variant-select {
@@ -463,6 +464,7 @@ body {
 /* ===== ADD TO CART BUTTON ===== */
 .add-to-cart-btn {
     width: 100%;
+    margin-top: auto;
     background: linear-gradient(135deg, var(--primary), var(--primary-light));
     color: #fff;
     border: none;
