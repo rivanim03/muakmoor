@@ -43,23 +43,24 @@ function matchScore(productName, altText) {
   return m;
 }
 
-async function searchLazada(page, productName) {
+async function searchLazada(page, productName, isFreshContext) {
   const q = encodeURIComponent(productName);
   try {
-    // First visit homepage to establish session cookies
-    await page.goto('https://www.lazada.co.id/', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
-    await sleep(2000);
+    // Only visit homepage on fresh context to establish session
+    if (isFreshContext) {
+      await page.goto('https://www.lazada.co.id/', { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
+      await sleep(1500);
+    }
 
     await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
-      waitUntil: 'networkidle', timeout: 25000
+      waitUntil: 'networkidle', timeout: 18000
     });
   } catch (e) {
-    // Fallback: just the search URL
     await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
-      waitUntil: 'domcontentloaded', timeout: 20000
+      waitUntil: 'domcontentloaded', timeout: 12000
     }).catch(() => {});
   }
-  await sleep(4000);
+  await sleep(2000);
 
   const results = await page.evaluate(() => {
     const found = [];
@@ -107,16 +108,15 @@ async function searchBing(page, productName) {
   } catch (e) { return []; }
 }
 
-async function findOne(page, product) {
+async function findOne(page, product, isFreshContext) {
   const { id, name } = product;
   console.log(`\n📦 [${id}] ${name}`);
 
-  // Only Lazada — Bing returns garbage for niche Indonesian products
   let candidates = [];
   let retries = 0;
-  while (retries < 3 && candidates.length === 0) {
-    if (retries > 0) { console.log(`   🔄 Retry ${retries}...`); await sleep(8000); }
-    try { candidates = await searchLazada(page, name); } catch(e) {}
+  while (retries < 2 && candidates.length === 0) {
+    if (retries > 0) { console.log(`   🔄 Retry...`); await sleep(4000); }
+    try { candidates = await searchLazada(page, name, isFreshContext && retries === 0); } catch(e) {}
     retries++;
   }
   console.log(`   Lazada: ${candidates.length}`);
@@ -208,13 +208,14 @@ async function main() {
     const p = prods[i];
     if (m[p.id] && m[p.id].url) { process.stdout.write(`\r⏭️  ${i+1}/${prods.length} ${p.name}`); continue; }
 
-    // Rotate context periodically to avoid rate limits
+    let isFreshContext = (i === 0);
     if (i > 0 && i % ROTATE_EVERY === 0) {
       console.log(`\n🔄 Rotating browser context (product ${i})...`);
       const fresh = await makeContext();
       context = fresh.context;
       page = fresh.page;
-      await sleep(3000);
+      isFreshContext = true;
+      await sleep(2000);
     }
 
     // If 3 consecutive fails, rotate context + longer pause
@@ -224,10 +225,12 @@ async function main() {
       context = fresh.context;
       page = fresh.page;
       consecutiveFails = 0;
-      await sleep(15000);
+      isFreshContext = true;
+      await sleep(10000);
     }
 
-    const url = await findOne(page, p);
+    const url = await findOne(page, p, isFreshContext);
+    isFreshContext = false;
     if (url) {
       m[p.id] = { name: p.name, url, status: 'found' };
       ok++;
