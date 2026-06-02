@@ -171,24 +171,85 @@ async function main() {
       '--disable-features=IsolateOrigins,site-per-process',
     ]
   });
-  const context = await browser.newContext({
-    locale: 'id-ID',
-    timezoneId: 'Asia/Jakarta',
-    viewport: { width: 414, height: 896 },  // iPhone 11 size — less bot-like
-    userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-  });
-  const page = await context.newPage();
+
+  const userAgents = [
+    'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
+    'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
+    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
+  ];
+
+  let contextIdx = 0;
+  const makeContext = async () => {
+    if (contextIdx > 0) {
+      // Close old context
+      const oldPage = await context.pages().then(ps => ps[0]).catch(() => null);
+      if (oldPage) await oldPage.close().catch(() => {});
+      await context.close().catch(() => {});
+    }
+    const ua = userAgents[contextIdx % userAgents.length];
+    const ctx = await browser.newContext({
+      locale: 'id-ID',
+      timezoneId: 'Asia/Jakarta',
+      viewport: { width: 390 + Math.floor(Math.random() * 60), height: 844 + Math.floor(Math.random() * 40) },
+      userAgent: ua,
+    });
+    contextIdx++;
+    return { context: ctx, page: await ctx.newPage() };
+  };
+
+  let { context, page } = await makeContext();
+  const ROTATE_EVERY = 25; // fresh session every 25 products
   console.log('✅ Ready!\n');
 
   let ok = 0, fail = 0;
+  let consecutiveFails = 0;
   for (let i = 0; i < prods.length; i++) {
     const p = prods[i];
     if (m[p.id] && m[p.id].url) { process.stdout.write(`\r⏭️  ${i+1}/${prods.length} ${p.name}`); continue; }
+
+    // Rotate context periodically to avoid rate limits
+    if (i > 0 && i % ROTATE_EVERY === 0) {
+      console.log(`\n🔄 Rotating browser context (product ${i})...`);
+      const fresh = await makeContext();
+      context = fresh.context;
+      page = fresh.page;
+      await sleep(3000);
+    }
+
+    // If 3 consecutive fails, rotate context + longer pause
+    if (consecutiveFails >= 3) {
+      console.log(`\n⚠️  3 consecutive fails — rotating context & pausing...`);
+      const fresh = await makeContext();
+      context = fresh.context;
+      page = fresh.page;
+      consecutiveFails = 0;
+      await sleep(15000);
+    }
+
     const url = await findOne(page, p);
-    if (url) { m[p.id] = { name: p.name, url, status: 'found' }; ok++; }
-    else { fail++; fl.push({ id: p.id, name: p.name }); m[p.id] = { name: p.name, url: null, status: 'failed' }; }
+    if (url) {
+      m[p.id] = { name: p.name, url, status: 'found' };
+      ok++;
+      consecutiveFails = 0;
+    } else {
+      fail++;
+      consecutiveFails++;
+      fl.push({ id: p.id, name: p.name });
+      m[p.id] = { name: p.name, url: null, status: 'failed' };
+    }
     process.stdout.write(`\r📊 ${i+1}/${prods.length} | ✅ ${ok} | ❌ ${fail}`);
-    if (i < prods.length - 1) await sleep(CFG.delay);
+
+    // Save progress every 50 products
+    if (i > 0 && i % 50 === 0) {
+      fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
+      fs.writeFileSync(fPath, JSON.stringify(fl, null, 2), 'utf-8');
+    }
+
+    if (i < prods.length - 1) {
+      const jitter = 1000 + Math.floor(Math.random() * (CFG.delay));
+      await sleep(jitter);
+    }
   }
 
   await browser.close();

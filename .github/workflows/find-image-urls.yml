@@ -29,7 +29,11 @@ jobs:
         run: npx playwright install --with-deps chromium
 
       - name: Find image URLs (all products)
-        run: node scripts/find_image_urls.js --mode=full
+        run: |
+          # First attempt: full, then resume failed ones in same run
+          node scripts/find_image_urls.js --mode=full || true
+          node scripts/find_image_urls.js --mode=resume || true
+          node scripts/find_image_urls.js --mode=resume || true
         timeout-minutes: 350
         continue-on-error: true
         env:
