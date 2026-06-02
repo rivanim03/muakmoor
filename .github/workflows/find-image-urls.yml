@@ -30,7 +30,10 @@ jobs:
 
       - name: Find image URLs (all products)
         run: node scripts/find_image_urls.js --mode=full
+        timeout-minutes: 350
         continue-on-error: true
+        env:
+          CI: true
 
       - name: Commit & push updated image-mapping.js
         run: |

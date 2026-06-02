@@ -15,7 +15,7 @@ const XLSX = require('xlsx');
 const CFG = {
   excel: path.join(__dirname, '..', 'Daftar Produk.xlsx'),
   out: path.join(__dirname, '..', 'assets', 'images'),
-  delay: 2000,
+  delay: process.env.CI ? 4000 : 2000,  // longer delay in CI to avoid rate limits
   mode: process.argv.find(a => a.startsWith('--mode='))?.split('=')[1] || 'full',
 };
 
@@ -46,9 +46,18 @@ function matchScore(productName, altText) {
 async function searchLazada(page, productName) {
   const q = encodeURIComponent(productName);
   try {
-    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, { waitUntil: 'networkidle', timeout: 20000 });
+    // First visit homepage to establish session cookies
+    await page.goto('https://www.lazada.co.id/', { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+    await sleep(2000);
+
+    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
+      waitUntil: 'networkidle', timeout: 25000
+    });
   } catch (e) {
-    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, { waitUntil: 'domcontentloaded', timeout: 15000 }).catch(() => {});
+    // Fallback: just the search URL
+    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
+      waitUntil: 'domcontentloaded', timeout: 20000
+    }).catch(() => {});
   }
   await sleep(4000);
 
@@ -102,16 +111,17 @@ async function findOne(page, product) {
   const { id, name } = product;
   console.log(`\n📦 [${id}] ${name}`);
 
+  // Only Lazada — Bing returns garbage for niche Indonesian products
   let candidates = [];
-  try { candidates = await searchLazada(page, name); } catch(e) {}
+  let retries = 0;
+  while (retries < 3 && candidates.length === 0) {
+    if (retries > 0) { console.log(`   🔄 Retry ${retries}...`); await sleep(8000); }
+    try { candidates = await searchLazada(page, name); } catch(e) {}
+    retries++;
+  }
   console.log(`   Lazada: ${candidates.length}`);
 
-  if (candidates.length === 0) {
-    try { candidates = await searchBing(page, name); } catch(e) {}
-    console.log(`   Bing: ${candidates.length}`);
-  }
-
-  if (candidates.length === 0) { console.log(`   ❌ None`); return null; }
+  if (candidates.length === 0) { console.log(`   ❌ Not on Lazada`); return null; }
 
   const best = candidates[0];
   console.log(`   ✅ ${best.url.substring(0, 90)}...`);
@@ -151,8 +161,23 @@ async function main() {
 
   console.log('🚀 Launching Playwright...');
   const { chromium } = require('playwright');
-  const browser = await chromium.launch({ headless: true, args: ['--no-sandbox'] });
-  const page = await (await browser.newContext({ locale: 'id-ID', viewport: { width: 1280, height: 900 } })).newPage();
+  const browser = await chromium.launch({
+    headless: true,
+    args: [
+      '--no-sandbox',
+      '--disable-setuid-sandbox',
+      '--disable-dev-shm-usage',
+      '--disable-blink-features=AutomationControlled',
+      '--disable-features=IsolateOrigins,site-per-process',
+    ]
+  });
+  const context = await browser.newContext({
+    locale: 'id-ID',
+    timezoneId: 'Asia/Jakarta',
+    viewport: { width: 414, height: 896 },  // iPhone 11 size — less bot-like
+    userAgent: 'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+  });
+  const page = await context.newPage();
   console.log('✅ Ready!\n');
 
   let ok = 0, fail = 0;
