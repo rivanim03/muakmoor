@@ -182,9 +182,8 @@ async function main() {
   let contextIdx = 0;
   const makeContext = async () => {
     if (contextIdx > 0) {
-      // Close old context
-      const oldPage = await context.pages().then(ps => ps[0]).catch(() => null);
-      if (oldPage) await oldPage.close().catch(() => {});
+      const pages = context.pages();
+      if (pages.length > 0) await pages[0].close().catch(() => {});
       await context.close().catch(() => {});
     }
     const ua = userAgents[contextIdx % userAgents.length];
@@ -235,6 +234,9 @@ async function main() {
       m[p.id] = { name: p.name, url, status: 'found' };
       ok++;
       consecutiveFails = 0;
+      // Save immediately on success — never lose more than 1
+      fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
+      fs.writeFileSync(fPath, JSON.stringify(fl, null, 2), 'utf-8');
     } else {
       fail++;
       consecutiveFails++;
@@ -243,8 +245,8 @@ async function main() {
     }
     process.stdout.write(`\r📊 ${i+1}/${prods.length} | ✅ ${ok} | ❌ ${fail}`);
 
-    // Save progress every 50 products
-    if (i > 0 && i % 50 === 0) {
+    // Save progress every 10 products
+    if (i > 0 && i % 10 === 0) {
       fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
       fs.writeFileSync(fPath, JSON.stringify(fl, null, 2), 'utf-8');
     }
