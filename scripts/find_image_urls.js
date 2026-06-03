@@ -153,48 +153,6 @@ async function searchBlibli(page, productName) {
     .sort((a, b) => b.score - a.score);
 }
 
-// ── Bing Images (Lazada-focused) ───────────────────────────────────
-async function searchBing(page, productName) {
-  const q = encodeURIComponent(`site:lazada.co.id ${productName}`);
-  try {
-    await page.goto(`https://www.bing.com/images/search?q=${q}`, {
-      waitUntil: "domcontentloaded", timeout: 15000
-    });
-  } catch (e) { return []; }
-
-  await sleep(2000);
-  // Dismiss cookie popup if present
-  try {
-    const btn = page.locator('#bnp_btn_accept, button[name="accept"]').first();
-    if (await btn.isVisible({ timeout: 800 }).catch(() => false)) { await btn.click(); await sleep(400); }
-  } catch(e) {}
-
-  await page.evaluate(() => window.scrollBy(0, 600));
-  await sleep(600);
-
-  const results = await page.evaluate(() => {
-    const found = [];
-    document.querySelectorAll("a.iusc").forEach(a => {
-      const m = a.getAttribute("m");
-      if (!m) return;
-      try {
-        const d = JSON.parse(m);
-        const url = d.murl || "";
-        // Only keep images from Lazada CDN
-        if (!url.includes("lazcdn.com")) return;
-        if (!url.match(/\.(jpg|jpeg|png|webp)/i)) return;
-        // Skip clipart/icons/logos
-        if (/clipart|painting|illust|wallpaper|logo|icon|vector/i.test(url)) return;
-        found.push({ url, alt: d.t || "" });
-      } catch(e) {}
-    });
-    return found.slice(0, 10);
-  });
-
-  return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
-    .sort((a, b) => b.score - a.score);
-}
-
 // ── Single product ─────────────────────────────────────────────────
 async function findOne(page, product) {
   const { name } = product;
@@ -216,14 +174,6 @@ async function findOne(page, product) {
 
   if (results.length > 0) {
     return { url: results[0].url, source: "blibli", score: results[0].score };
-  }
-
-  // 3. Bing Images (finds Lazada CDN images via Bing)
-  await sleep(1000);
-  try { results = await searchBing(page, name); } catch (e) {}
-
-  if (results.length > 0) {
-    return { url: cleanUrl(results[0].url), source: "bing", score: results[0].score };
   }
 
   return null;
@@ -262,7 +212,7 @@ async function worker(browser, workerId, prods, sharedState) {
   let uaIdx = workerId;
   let { ctx, page } = await createContext(browser, uas[uaIdx % uas.length]);
 
-  let ok = 0, lazOk = 0, bliOk = 0, bingOk = 0, fail = 0, consec = 0;
+  let ok = 0, lazOk = 0, bliOk = 0, fail = 0, consec = 0;
   const ROTATE_EVERY = 50;
   let rotations = 0;
 
@@ -298,12 +248,11 @@ async function worker(browser, workerId, prods, sharedState) {
     // Update shared state
     if (result && result.url) {
       sharedState.m[p.id] = { name: p.name, url: result.url, source: result.source, status: "found" };
-      ok++; if (result.source === "lazada") lazOk++; else if (result.source === "blibli") bliOk++; else bingOk++;
+      ok++; if (result.source === "lazada") lazOk++; else bliOk++;
       consec = 0;
       sharedState.stats.ok++;
       if (result.source === "lazada") sharedState.stats.lazOk++;
-      else if (result.source === "blibli") sharedState.stats.bliOk++;
-      else sharedState.stats.bingOk++;
+      else sharedState.stats.bliOk++;
     } else {
       sharedState.m[p.id] = { name: p.name, url: null, status: "failed" };
       sharedState.fl.push({ id: p.id, name: p.name });
@@ -326,7 +275,7 @@ async function worker(browser, workerId, prods, sharedState) {
   }
 
   await ctx.close().catch(() => {});
-  return { ok, fail, lazOk, bliOk, bingOk };
+  return { ok, fail, lazOk, bliOk };
 }
 
 // ── Main ───────────────────────────────────────────────────────────
@@ -357,7 +306,7 @@ async function main() {
   const sharedState = {
     m: fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, "utf-8")) : {},
     fl: fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, "utf-8")) : [],
-    stats: { ok: 0, lazOk: 0, bliOk: 0, bingOk: 0, fail: 0, done: 0 },
+    stats: { ok: 0, lazOk: 0, bliOk: 0, fail: 0, done: 0 },
     total,
     lock: false,
     mp, fp,
@@ -425,7 +374,7 @@ async function main() {
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const mins = Math.floor(elapsed / 60);
   const secs = elapsed % 60;
-  console.log(`\n\n⏱️  ${mins}m ${secs}s | ✅ ${sharedState.stats.ok} URLs (Lazada:${sharedState.stats.lazOk} Blibli:${sharedState.stats.bliOk} Bing:${sharedState.stats.bingOk}) | ❌ ${sharedState.stats.fail} failed`);
+  console.log(`\n\n⏱️  ${mins}m ${secs}s | ✅ ${sharedState.stats.ok} URLs (Lazada:${sharedState.stats.lazOk} Blibli:${sharedState.stats.bliOk}) | ❌ ${sharedState.stats.fail} failed`);
   if (CFG.mode === "quick") console.log(`🔥 Full run: node scripts/find_image_urls.js --mode=full`);
   if (sharedState.fl.length > 0) console.log(`💡 Retry failed: node scripts/find_image_urls.js --mode=resume\n`);
 }
