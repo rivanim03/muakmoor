@@ -80,6 +80,10 @@ async function searchLazada(page, productName) {
     } catch (e) { if (a === 1) return []; await sleep(2000); }
   }
   await page.evaluate(() => window.scrollBy(0, 600));
+  await sleep(600);
+  await page.evaluate(() => window.scrollBy(0, 800));
+  await sleep(600);
+  await page.evaluate(() => window.scrollBy(0, 1000));
   await sleep(400);
 
   // ── Diagnostics ──
@@ -96,7 +100,7 @@ async function searchLazada(page, productName) {
     document.querySelectorAll("img[src*=\"lazcdn.com\"]").forEach(img => {
       const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
       const alt = (img.getAttribute("alt") || "").trim();
-      if (!src.includes("/g/p/") && !src.includes("/g/ff/")) return;
+      if (!src.includes("/g/p/") && !src.includes("/g/ff/") && !src.includes("/g/")) return;
       if (!alt || alt.length < 3) return;
       found.push({ url: src, alt });
     });
