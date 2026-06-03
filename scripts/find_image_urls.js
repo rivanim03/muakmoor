@@ -1,10 +1,11 @@
 /**
- * MAKMUR GROSIR - IMAGE URL FINDER (STEALTH + PARALLEL)
- * Searches Lazada + Blibli for product image URLs.
- * Uses 2 parallel workers with human-like pacing to avoid rate limits.
+ * MAKMUR GROSIR - IMAGE URL FINDER (BATCH MODE)
+ * Processes 50 products per run, designed for scheduled GitHub Actions.
+ * Accumulates results across runs via _mapping.json.
  *
+ * node scripts/find_image_urls.js --mode=batch   (50 pending products)
  * node scripts/find_image_urls.js --mode=quick   (test 10)
- * node scripts/find_image_urls.js --mode=full    (all 2,781)
+ * node scripts/find_image_urls.js --mode=full    (all — use locally)
  * node scripts/find_image_urls.js --mode=resume  (retry failed)
  */
 
@@ -15,13 +16,14 @@ const XLSX = require("xlsx");
 const CFG = {
   excel: path.join(__dirname, "..", "Daftar Produk.xlsx"),
   out: path.join(__dirname, "..", "assets", "images"),
-  delay: process.env.CI ? 5000 : 1000,
-  mode: process.argv.find(a => a.startsWith("--mode="))?.split("=")[1] || "full",
-  workers: process.env.CI ? 2 : 2,
+  delay: process.env.CI ? 3000 : 1000,
+  batchSize: 50,
+  mode: process.argv.find(a => a.startsWith("--mode="))?.split("=")[1] || "batch",
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── Excel ──────────────────────────────────────────────────────────
 function readExcel() {
   console.log("📖 Reading Excel...");
   const wb = XLSX.readFile(CFG.excel);
@@ -33,10 +35,10 @@ function readExcel() {
     if (!n || out.find(x => x.name.toUpperCase() === n.toUpperCase())) continue;
     out.push({ id: out.length + 1, name: n });
   }
-  console.log(`✅ ${out.length} products\n`);
   return out;
 }
 
+// ── Scoring ────────────────────────────────────────────────────────
 function matchScore(productName, altText) {
   const p = productName.toLowerCase(), a = altText.toLowerCase();
   let m = 0;
@@ -48,17 +50,16 @@ function cleanUrl(url) {
   return url.replace(/(\.(?:jpg|jpeg|png|webp))[_.].*$/i, "$1");
 }
 
+// ── Stealth ────────────────────────────────────────────────────────
 async function applyStealth(page) {
   await page.addInitScript(() => {
     Object.defineProperty(navigator, "webdriver", { get: () => false });
     try { window.chrome = { runtime: {} }; } catch(e) {}
     try { Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] }); } catch(e) {}
     try {
-      const origQuery = navigator.permissions.query.bind(navigator.permissions);
-      navigator.permissions.query = (params) =>
-        params.name === "notifications"
-          ? Promise.resolve({ state: Notification.permission, onchange: null })
-          : origQuery(params);
+      const orig = navigator.permissions.query.bind(navigator.permissions);
+      navigator.permissions.query = (p) =>
+        p.name === "notifications" ? Promise.resolve({ state: Notification.permission, onchange: null }) : orig(p);
     } catch(e) {}
     try { Object.defineProperty(navigator, "languages", { get: () => ["id-ID", "id", "en-US", "en"] }); } catch(e) {}
     try { Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 }); } catch(e) {}
@@ -66,21 +67,17 @@ async function applyStealth(page) {
   });
 }
 
+// ── Lazada ─────────────────────────────────────────────────────────
 async function searchLazada(page, productName) {
   const q = encodeURIComponent(productName);
-  const url = `https://www.lazada.co.id/catalog/?q=${q}`;
-  for (let attempt = 0; attempt < 2; attempt++) {
+  for (let a = 0; a < 2; a++) {
     try {
-      await page.goto(url, {
-        waitUntil: attempt === 0 ? "domcontentloaded" : "networkidle",
-        timeout: 15000
+      await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
+        waitUntil: a === 0 ? "domcontentloaded" : "networkidle", timeout: 15000
       });
-      await sleep(attempt === 0 ? 1500 : 2000);
+      await sleep(a === 0 ? 1500 : 2000);
       break;
-    } catch (e) {
-      if (attempt === 1) return [];
-      await sleep(2000);
-    }
+    } catch (e) { if (a === 1) return []; await sleep(2000); }
   }
   await page.evaluate(() => window.scrollBy(0, 600));
   await sleep(400);
@@ -99,13 +96,11 @@ async function searchLazada(page, productName) {
     .sort((a, b) => b.score - a.score);
 }
 
+// ── Blibli ─────────────────────────────────────────────────────────
 async function searchBlibli(page, productName) {
   const q = encodeURIComponent(productName);
-  try {
-    await page.goto(`https://www.blibli.com/cari/${q}`, {
-      waitUntil: "domcontentloaded", timeout: 15000
-    });
-  } catch (e) { return []; }
+  try { await page.goto(`https://www.blibli.com/cari/${q}`, { waitUntil: "domcontentloaded", timeout: 15000 }); }
+  catch (e) { return []; }
   await sleep(2000);
   await page.evaluate(() => window.scrollBy(0, 800));
   await sleep(600);
@@ -124,6 +119,7 @@ async function searchBlibli(page, productName) {
     .sort((a, b) => b.score - a.score);
 }
 
+// ── Single product ─────────────────────────────────────────────────
 async function findOne(page, product) {
   const { name } = product;
   let results = [];
@@ -131,17 +127,16 @@ async function findOne(page, product) {
     try { results = await searchLazada(page, name); } catch (e) {}
     if (results.length === 0 && retry < 1) await sleep(1500);
   }
-  if (results.length > 0) {
-    return { url: cleanUrl(results[0].url), source: "lazada", score: results[0].score };
-  }
+  if (results.length > 0) return { url: cleanUrl(results[0].url), source: "lazada", score: results[0].score };
+
   await sleep(1000);
   try { results = await searchBlibli(page, name); } catch (e) {}
-  if (results.length > 0) {
-    return { url: results[0].url, source: "blibli", score: results[0].score };
-  }
+  if (results.length > 0) return { url: results[0].url, source: "blibli", score: results[0].score };
+
   return null;
 }
 
+// ── Generate JS mapping ────────────────────────────────────────────
 function genJs(m) {
   const entries = Object.entries(m).filter(([_, e]) => e.url);
   const lines = [`/** Auto-generated — ${entries.length} product image URLs */`, "const productImages = {"];
@@ -152,186 +147,117 @@ function genJs(m) {
   fs.writeFileSync(path.join(CFG.out, "image-mapping.js"), lines.join("\n") + "\n", "utf-8");
 }
 
-async function createContext(browser, ua) {
+// ── Main ───────────────────────────────────────────────────────────
+async function main() {
+  const all = readExcel();
+  const totalAll = all.length;
+  const mp = path.join(CFG.out, "_mapping.json");
+  const fp = path.join(CFG.out, "_failed.json");
+  if (!fs.existsSync(CFG.out)) fs.mkdirSync(CFG.out, { recursive: true });
+
+  let m = fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, "utf-8")) : {};
+  let fl = fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, "utf-8")) : [];
+  const foundCount = Object.values(m).filter(e => e && e.url).length;
+
+  // ── Pick products ──
+  let prods;
+  if (CFG.mode === "quick") {
+    prods = all.slice(0, 10);
+  } else if (CFG.mode === "resume") {
+    prods = fl.map(f => all.find(x => x.id === f.id)).filter(Boolean);
+  } else if (CFG.mode === "full") {
+    prods = [...all];
+  } else {
+    // batch mode: next N pending products
+    const pending = all.filter(p => !m[p.id] || !m[p.id].url);
+    prods = pending.slice(0, CFG.batchSize);
+  }
+
+  console.log("╔══════════════════════════════════════════╗");
+  console.log(`║  🔗 BATCH IMAGE FINDER — Lazada+Blibli  ║`);
+  console.log(`║  Mode: ${CFG.mode.padEnd(33)}║`);
+  console.log(`║  Total catalog: ${String(totalAll).padEnd(24)}║`);
+  console.log(`║  Already found: ${String(foundCount).padEnd(24)}║`);
+  console.log(`║  This batch: ${String(prods.length).padEnd(28)}║`);
+  console.log("╚══════════════════════════════════════════╝\n");
+
+  if (prods.length === 0) {
+    console.log("✅ All products have URLs — nothing to do!");
+    genJs(m);
+    return;
+  }
+
+  // ── Browser ──
+  console.log("🚀 Launching Firefox...");
+  const { chromium, firefox } = require("playwright");
+  let browser, browserType = "firefox";
+  try {
+    browser = await firefox.launch({ headless: true });
+    console.log("✅ Firefox");
+  } catch (e) {
+    browserType = "chromium";
+    browser = await chromium.launch({
+      headless: true,
+      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+             "--disable-blink-features=AutomationControlled",
+             "--disable-features=IsolateOrigins,site-per-process"]
+    });
+    console.log("⚠️  Chromium (Firefox not available)");
+  }
+
   const ctx = await browser.newContext({
     locale: "id-ID", timezoneId: "Asia/Jakarta",
     viewport: { width: 1366, height: 768 },
-    userAgent: ua,
+    userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
     extraHTTPHeaders: {
       "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
       "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     }
   });
-  const p = await ctx.newPage();
-  await applyStealth(p);
-  return { ctx, page: p };
-}
+  const page = await ctx.newPage();
+  await applyStealth(page);
+  console.log("✅ Ready!\n");
 
-async function worker(browser, workerId, prods, sharedState) {
-  const uas = sharedState.userAgents;
-  let uaIdx = workerId;
-  let { ctx, page } = await createContext(browser, uas[uaIdx % uas.length]);
-  let ok = 0, lazOk = 0, bliOk = 0, fail = 0, consec = 0;
-  const ROTATE_EVERY = 12;
-  const BREAK_EVERY = 7;
+  // ── Process ──
+  const startTime = Date.now();
+  let ok = 0, lazOk = 0, bliOk = 0, fail = 0;
 
   for (let i = 0; i < prods.length; i++) {
     const p = prods[i];
-    if (sharedState.m[p.id] && sharedState.m[p.id].url) continue;
+    console.log(`📦 [${p.id}] ${p.name}`);
 
-    // Periodic fresh session
-    if (i > 0 && i % ROTATE_EVERY === 0) {
-      await ctx.close().catch(() => {});
-      uaIdx++;
-      ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
-      await sleep(3000 + Math.random() * 4000);
-    }
-
-    // Human-like coffee break: visit homepage, pause 15-35s, fresh session
-    if (i > 0 && i % BREAK_EVERY === 0) {
-      console.log(`\n[W${workerId}] ☕ coffee break...`);
-      try { await page.goto("https://www.lazada.co.id/", { waitUntil: "domcontentloaded", timeout: 10000 }); } catch(e) {}
-      await sleep(15000 + Math.random() * 20000);
-      await ctx.close().catch(() => {});
-      uaIdx++;
-      ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
-    }
-
-    // 2 consecutive fails = fresh session + long pause
-    if (consec >= 2) {
-      await ctx.close().catch(() => {});
-      uaIdx++;
-      ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
-      consec = 0;
-      await sleep(10000 + Math.random() * 10000);
-    }
-
-    process.stdout.write(`\r[W${workerId}] ${i + 1}/${prods.length} | 📦 ${p.name.substring(0, 35)}...`);
     const result = await findOne(page, p);
 
     if (result && result.url) {
-      sharedState.m[p.id] = { name: p.name, url: result.url, source: result.source, status: "found" };
+      m[p.id] = { name: p.name, url: result.url, source: result.source, status: "found" };
       ok++; if (result.source === "lazada") lazOk++; else bliOk++;
-      consec = 0;
-      sharedState.stats.ok++;
-      if (result.source === "lazada") sharedState.stats.lazOk++;
-      else sharedState.stats.bliOk++;
+      console.log(`   ✅ ${result.source}: ${result.url.substring(0, 80)}...`);
     } else {
-      sharedState.m[p.id] = { name: p.name, url: null, status: "failed" };
-      sharedState.fl.push({ id: p.id, name: p.name });
-      fail++; consec++;
-      sharedState.stats.fail++;
-    }
-    sharedState.stats.done++;
-
-    if (sharedState.stats.done % 20 === 0 || (result && result.url)) {
-      fs.writeFileSync(sharedState.mp, JSON.stringify(sharedState.m, null, 2), "utf-8");
-      fs.writeFileSync(sharedState.fp, JSON.stringify(sharedState.fl, null, 2), "utf-8");
+      m[p.id] = { name: p.name, url: null, status: "failed" };
+      fl.push({ id: p.id, name: p.name });
+      fail++;
+      console.log(`   ❌ Not found`);
     }
 
-    process.stdout.write(`\r[W${workerId}] ${i + 1}/${prods.length} | ✅${ok} ❌${fail} | Total: ${sharedState.stats.done}/${sharedState.total}`);
+    // Save after every product in batch mode (safety)
+    fs.writeFileSync(mp, JSON.stringify(m, null, 2), "utf-8");
+    if (fl.length > 0) fs.writeFileSync(fp, JSON.stringify(fl, null, 2), "utf-8");
 
     if (i < prods.length - 1) {
-      await sleep(2000 + Math.floor(Math.random() * CFG.delay));
+      const jitter = 1000 + Math.floor(Math.random() * CFG.delay);
+      await sleep(jitter);
     }
   }
 
-  await ctx.close().catch(() => {});
-  return { ok, fail, lazOk, bliOk };
-}
-
-async function main() {
-  console.log("╔══════════════════════════════════════════╗");
-  console.log("║  🔗 IMAGE URL FINDER — Parallel Stealth ║");
-  console.log(`║  Workers: ${CFG.workers}                              ║`);
-  console.log("╚══════════════════════════════════════════╝\n");
-
-  const all = readExcel();
-  let prods = [...all];
-  if (CFG.mode === "quick") prods = prods.slice(0, 10);
-  else if (CFG.mode === "resume") {
-    const fp = path.join(CFG.out, "_failed.json");
-    if (fs.existsSync(fp)) {
-      prods = JSON.parse(fs.readFileSync(fp, "utf-8"))
-        .map(f => all.find(x => x.id === f.id)).filter(Boolean);
-    }
-  }
-  const total = prods.length;
-  console.log(`${CFG.mode === "quick" ? "⚡ Quick: 10" : CFG.mode === "resume" ? "🔄 Resume: " + total : "🔥 Full: " + total}\n`);
-
-  if (!fs.existsSync(CFG.out)) fs.mkdirSync(CFG.out, { recursive: true });
-
-  const mp = path.join(CFG.out, "_mapping.json");
-  const fp = path.join(CFG.out, "_failed.json");
-
-  const sharedState = {
-    m: fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, "utf-8")) : {},
-    fl: fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, "utf-8")) : [],
-    stats: { ok: 0, lazOk: 0, bliOk: 0, fail: 0, done: 0 },
-    total,
-    mp, fp,
-    userAgents: [
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-    ],
-  };
-
-  let remaining = prods.filter(p => !sharedState.m[p.id] || !sharedState.m[p.id].url);
-  console.log(`📋 ${remaining.length}/${total} products to process\n`);
-
-  if (remaining.length === 0) {
-    console.log("✅ All products already have URLs!");
-    genJs(sharedState.m);
-    return;
-  }
-
-  console.log("🚀 Launching Firefox (better stealth vs datacenter IPs)...");
-  const { chromium, firefox } = require("playwright");
-  let browser;
-  let browserType = "firefox";
-  try {
-    browser = await firefox.launch({ headless: true });
-    console.log("✅ Firefox launched");
-  } catch (e) {
-    console.log("⚠️  Firefox not available, falling back to Chromium...");
-    browserType = "chromium";
-    browser = await chromium.launch({
-      headless: true,
-      args: [
-        "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
-        "--disable-blink-features=AutomationControlled",
-        "--disable-features=IsolateOrigins,site-per-process",
-      ]
-    });
-  }
-  console.log(`🔧 Using ${browserType}\n`);
-
-  const workers = Math.min(CFG.workers, remaining.length);
-  const chunkSize = Math.ceil(remaining.length / workers);
-  const chunks = [];
-  for (let w = 0; w < workers; w++) {
-    chunks.push(remaining.slice(w * chunkSize, (w + 1) * chunkSize));
-  }
-
-  console.log(`⚡ Starting ${workers} parallel workers (${chunks.map(c => c.length).join(", ")} products each)...\n`);
-
-  const startTime = Date.now();
-  await Promise.allSettled(
-    chunks.map((chunk, idx) => worker(browser, idx, chunk, sharedState))
-  );
   await browser.close();
-
-  fs.writeFileSync(mp, JSON.stringify(sharedState.m, null, 2), "utf-8");
-  if (sharedState.fl.length > 0) fs.writeFileSync(fp, JSON.stringify(sharedState.fl, null, 2), "utf-8");
-  genJs(sharedState.m);
+  genJs(m);
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
-  console.log(`\n\n⏱️  ${mins}m ${secs}s | ✅ ${sharedState.stats.ok} URLs (Lazada:${sharedState.stats.lazOk} Blibli:${sharedState.stats.bliOk}) | ❌ ${sharedState.stats.fail} failed`);
-  if (CFG.mode === "quick") console.log(`🔥 Full run: node scripts/find_image_urls.js --mode=full`);
-  if (sharedState.fl.length > 0) console.log(`💡 Retry failed: node scripts/find_image_urls.js --mode=resume\n`);
+  console.log(`\n⏱️  ${Math.floor(elapsed / 60)}m ${elapsed % 60}s | ✅ ${ok} (L:${lazOk} B:${bliOk}) | ❌ ${fail}`);
+  console.log(`📊 Progress: ${foundCount + ok}/${totalAll} (${((foundCount + ok) / totalAll * 100).toFixed(1)}%)`);
+  if (CFG.mode === "batch" && prods.length === CFG.batchSize) {
+    console.log(`⏰ Next batch will continue from product #${foundCount + ok + 1}`);
+  }
 }
 
 main().catch(err => { console.error("\n❌ Fatal:", err); process.exit(1); });

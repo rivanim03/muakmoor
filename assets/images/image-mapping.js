@@ -1,6 +1,6 @@
 /** Auto-generated — 10 product image URLs */
 const productImages = {
-  "1":{"name":"ABC BATERAI JAM","url":"https://img.lazcdn.com/g/p/e41f59c5e6098193cffe9edd0a46c2f7.jpg","source":"lazada","status":"found"},
+  "1":{"name":"ABC BATERAI JAM","url":"https://img.lazcdn.com/g/p/b81957271d3e9934b74bcd63dcaacc82.jpg","source":"lazada","status":"found"},
   "2":{"name":"ABC BATERAI REMOT","url":"https://img.lazcdn.com/g/p/857c903f9897e535c7e9f5d1dddc36bd.jpg","source":"lazada","status":"found"},
   "3":{"name":"ABC BATERAI REMOT HITAM","url":"https://img.lazcdn.com/g/ff/kf/S3a668b39130442e880824e30bd8e9e76w.jpg","source":"lazada","status":"found"},
   "4":{"name":"ABC BOTOL CHOCOMALT","url":"https://img.lazcdn.com/g/ff/kf/S594c6ff512dd4d2cb8af98f864fd6f85u.jpg","source":"lazada","status":"found"},
