@@ -208,19 +208,20 @@ async function main() {
   const { chromium, firefox } = require("playwright");
   let browser, browserType;
 
-  // Try real Chrome first (less detectable than Playwright Chromium)
+  // Try real Chrome with xvfb (non-headless = undetectable)
   try {
     browser = await chromium.launch({
-      channel: "chrome",  // uses system-installed Google Chrome
-      headless: true,
+      channel: "chrome",
+      headless: !process.env.CI,  // headed in CI (xvfb), headless locally
       args: [
         "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
         "--disable-blink-features=AutomationControlled",
+        "--window-size=1366,768",
       ],
       ignoreDefaultArgs: ["--enable-automation"],
     });
     browserType = "chrome";
-    console.log("✅ Google Chrome");
+    console.log(`✅ Google Chrome (${process.env.CI ? "headed+xvfb" : "headless"})`);
   } catch (e) {
     // Fallback: Firefox
     try {
@@ -230,10 +231,11 @@ async function main() {
     } catch (e2) {
       // Last resort: Playwright Chromium
       browser = await chromium.launch({
-        headless: true,
+        headless: !process.env.CI,
         args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
                "--disable-blink-features=AutomationControlled",
-               "--disable-features=IsolateOrigins,site-per-process"],
+               "--disable-features=IsolateOrigins,site-per-process",
+               "--window-size=1366,768"],
         ignoreDefaultArgs: ["--enable-automation"],
       });
       browserType = "chromium";
