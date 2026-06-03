@@ -27,14 +27,17 @@ jobs:
 
       - name: Install Google Chrome + Playwright
         run: |
-          # Install Google Chrome Stable (real Chrome, harder to detect)
-          wget -q -O - https://dl.google.com/linux/linux_signing_key.pub | sudo apt-key add -
-          sudo sh -c 'echo "deb [arch=amd64] http://dl.google.com/linux/chrome/deb/ stable main" > /etc/apt/sources.list.d/google-chrome.list'
-          sudo apt-get update
+          # Install Google Chrome Stable (Ubuntu 24.04 compatible method)
+          sudo mkdir -p /etc/apt/keyrings
+          wget -q -O- https://dl.google.com/linux/linux_signing_key.pub | gpg --dearmor | sudo tee /etc/apt/keyrings/google-chrome.gpg > /dev/null
+          echo "deb [arch=amd64 signed-by=/etc/apt/keyrings/google-chrome.gpg] http://dl.google.com/linux/chrome/deb/ stable main" | sudo tee /etc/apt/sources.list.d/google-chrome.list
+          sudo apt-get update -qq
           sudo apt-get install -y google-chrome-stable
-          # Install Playwright browsers as fallback
-          npx playwright install --with-deps firefox
-          npx playwright install --with-deps chromium
+          google-chrome --version
+          # Verify Playwright can find Chrome
+          node -e "const c = require('playwright').chromium; c.launch({channel:'chrome',headless:true}).then(b => { console.log('✅ Playwright + Chrome OK'); b.close() }).catch(e => console.log('❌ Chrome not found:', e.message))"
+          # Install fallback browsers
+          npx playwright install --with-deps firefox chromium
 
       - name: Process next batch (50 products)
         run: node scripts/find_image_urls.js --mode=batch
