@@ -1,34 +1,36 @@
-/**
- * MAKMUR GROSIR - IMAGE URL FINDER
- * Searches Lazada/Bing for product image URLs — saves URLs only,
- * no downloading. App loads images directly from external CDNs.
+﻿/**
+ * MAKMUR GROSIR - IMAGE URL FINDER (STEALTH + PARALLEL)
+ * Searches Lazada + Blibli for product image URLs.
+ * Uses 3 parallel workers to process 2,781 products in ~2 hours.
  *
  * node scripts/find_image_urls.js --mode=quick   (test 10)
- * node scripts/find_image_urls.js --mode=full    (all 2,781)
- * node scripts/find_image_urls.js --mode=resume  (retry)
+ * node scripts/find_image_urls.js --mode=full    (all 2,781 — parallel)
+ * node scripts/find_image_urls.js --mode=resume  (retry failed — parallel)
  */
 
-const fs = require('fs');
-const path = require('path');
-const XLSX = require('xlsx');
+const fs = require("fs");
+const path = require("path");
+const XLSX = require("xlsx");
 
 const CFG = {
-  excel: path.join(__dirname, '..', 'Daftar Produk.xlsx'),
-  out: path.join(__dirname, '..', 'assets', 'images'),
-  delay: process.env.CI ? 4000 : 2000,  // longer delay in CI to avoid rate limits
-  mode: process.argv.find(a => a.startsWith('--mode='))?.split('=')[1] || 'full',
+  excel: path.join(__dirname, "..", "Daftar Produk.xlsx"),
+  out: path.join(__dirname, "..", "assets", "images"),
+  delay: process.env.CI ? 2000 : 1000,
+  mode: process.argv.find(a => a.startsWith("--mode="))?.split("=")[1] || "full",
+  workers: process.env.CI ? 3 : 2,  // 3 parallel in CI, 2 locally
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+// ── Excel ──────────────────────────────────────────────────────────
 function readExcel() {
-  console.log('📖 Reading Excel...');
+  console.log("📖 Reading Excel...");
   const wb = XLSX.readFile(CFG.excel);
-  const ws = wb.Sheets['Sheet'];
-  const data = XLSX.utils.sheet_to_json(ws, { defval: '', header: 1 });
+  const ws = wb.Sheets["Sheet"];
+  const data = XLSX.utils.sheet_to_json(ws, { defval: "", header: 1 });
   const out = [];
   for (let i = 1; i < data.length; i++) {
-    const n = (data[i][1] || '').trim();
+    const n = (data[i][1] || "").trim();
     if (!n || out.find(x => x.name.toUpperCase() === n.toUpperCase())) continue;
     out.push({ id: out.length + 1, name: n });
   }
@@ -36,6 +38,7 @@ function readExcel() {
   return out;
 }
 
+// ── Scoring ────────────────────────────────────────────────────────
 function matchScore(productName, altText) {
   const p = productName.toLowerCase(), a = altText.toLowerCase();
   let m = 0;
@@ -43,33 +46,72 @@ function matchScore(productName, altText) {
   return m;
 }
 
-async function searchLazada(page, productName, isFreshContext) {
-  const q = encodeURIComponent(productName);
-  try {
-    // Only visit homepage on fresh context to establish session
-    if (isFreshContext) {
-      await page.goto('https://www.lazada.co.id/', { waitUntil: 'domcontentloaded', timeout: 12000 }).catch(() => {});
-      await sleep(1500);
-    }
+function cleanUrl(url) {
+  return url.replace(/(\.(?:jpg|jpeg|png|webp))[_.].*$/i, "$1");
+}
 
-    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
-      waitUntil: 'networkidle', timeout: 18000
+// ── Stealth ────────────────────────────────────────────────────────
+async function applyStealth(page) {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "webdriver", { get: () => false });
+    window.chrome = { runtime: {} };
+    Object.defineProperty(navigator, "plugins", {
+      get: () => {
+        const arr = [
+          { name: "Chrome PDF Plugin", filename: "internal-pdf-viewer" },
+          { name: "Chrome PDF Viewer", filename: "mhjfbmdgcfjbbpaeojofohoefgiehjai" },
+          { name: "Native Client", filename: "internal-nacl-plugin" },
+        ];
+        arr.item = i => arr[i];
+        arr.namedItem = n => arr.find(p => p.name === n);
+        arr.refresh = () => {};
+        Object.setPrototypeOf(arr, PluginArray.prototype);
+        return arr;
+      }
     });
-  } catch (e) {
-    await page.goto(`https://www.lazada.co.id/catalog/?q=${q}`, {
-      waitUntil: 'domcontentloaded', timeout: 12000
-    }).catch(() => {});
+    const origQuery = navigator.permissions.query.bind(navigator.permissions);
+    navigator.permissions.query = (params) =>
+      params.name === "notifications"
+        ? Promise.resolve({ state: Notification.permission, onchange: null })
+        : origQuery(params);
+    Object.defineProperty(navigator, "languages", { get: () => ["id-ID", "id", "en-US", "en"] });
+    Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 });
+    Object.defineProperty(navigator, "deviceMemory", { get: () => 8 });
+  });
+}
+
+// ── Lazada ─────────────────────────────────────────────────────────
+async function searchLazada(page, productName) {
+  const q = encodeURIComponent(productName);
+  const url = `https://www.lazada.co.id/catalog/?q=${q}`;
+
+  // Fast: domcontentloaded first, networkidle only on retry
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      await page.goto(url, {
+        waitUntil: attempt === 0 ? "domcontentloaded" : "networkidle",
+        timeout: 15000
+      });
+      await sleep(attempt === 0 ? 1500 : 2000);
+      break;
+    } catch (e) {
+      if (attempt === 1) return [];
+      await sleep(2000);
+    }
   }
-  await sleep(2000);
+
+  // Quick scroll to trigger lazy images
+  await page.evaluate(() => window.scrollBy(0, 600));
+  await sleep(400);
 
   const results = await page.evaluate(() => {
     const found = [];
-    document.querySelectorAll('img[src*="http"]').forEach(img => {
-      const src = img.getAttribute('src') || '';
-      const alt = (img.getAttribute('alt') || '').trim();
-      if (src.includes('lazcdn.com/g/p/') && alt && alt.length > 5) {
-        found.push({ url: src.replace(/(\.(?:jpg|jpeg|png|webp))[_.].*$/i, '$1'), alt });
-      }
+    document.querySelectorAll("img[src*=\"lazcdn.com\"]").forEach(img => {
+      const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+      const alt = (img.getAttribute("alt") || "").trim();
+      if (!src.includes("/g/p/") && !src.includes("/g/ff/")) return;
+      if (!alt || alt.length < 3) return;
+      found.push({ url: src, alt });
     });
     return found;
   });
@@ -78,192 +120,248 @@ async function searchLazada(page, productName, isFreshContext) {
     .sort((a, b) => b.score - a.score);
 }
 
-async function searchBing(page, productName) {
-  const q = encodeURIComponent(productName + ' lazada');
+// ── Blibli ─────────────────────────────────────────────────────────
+async function searchBlibli(page, productName) {
+  const q = encodeURIComponent(productName);
   try {
-    await page.goto(`https://www.bing.com/images/search?q=${q}`, { waitUntil: 'domcontentloaded', timeout: 15000 });
-    await sleep(2000);
-    try {
-      const btn = page.locator('#bnp_btn_accept, button[name="accept"]').first();
-      if (await btn.isVisible({ timeout: 1000 }).catch(() => false)) { await btn.click(); await sleep(300); }
-    } catch(e) {}
-    await page.evaluate(() => window.scrollBy(0, 400));
-    await sleep(500);
-
-    return await page.evaluate(() => {
-      const found = [];
-      document.querySelectorAll('a.iusc').forEach(a => {
-        const m = a.getAttribute('m');
-        if (m) {
-          try {
-            const d = JSON.parse(m);
-            if (d.murl && d.murl.match(/\.(jpg|jpeg|png|webp)/i) && !/clipart|painting|illust|wallpaper|logo|icon|vector/i.test(d.murl)) {
-              found.push({ url: d.murl, alt: d.t || '', score: 0 });
-            }
-          } catch(e) {}
-        }
-      });
-      return found.slice(0, 5);
+    await page.goto(`https://www.blibli.com/cari/${q}`, {
+      waitUntil: "domcontentloaded", timeout: 15000
     });
   } catch (e) { return []; }
+
+  await sleep(2000);
+  await page.evaluate(() => window.scrollBy(0, 800));
+  await sleep(600);
+
+  const results = await page.evaluate(() => {
+    const found = [];
+    document.querySelectorAll("img[src*=\"static-src.com/wcsstore\"]").forEach(img => {
+      const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+      const alt = (img.getAttribute("alt") || "").trim();
+      if (!alt || alt.length < 3) return;
+      if (!src.includes("/catalog/")) return;
+      found.push({ url: src, alt });
+    });
+    return found;
+  });
+
+  return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
+    .sort((a, b) => b.score - a.score);
 }
 
-async function findOne(page, product, isFreshContext) {
-  const { id, name } = product;
-  console.log(`\n📦 [${id}] ${name}`);
+// ── Single product ─────────────────────────────────────────────────
+async function findOne(page, product) {
+  const { name } = product;
 
-  let candidates = [];
-  let retries = 0;
-  while (retries < 2 && candidates.length === 0) {
-    if (retries > 0) { console.log(`   🔄 Retry...`); await sleep(4000); }
-    try { candidates = await searchLazada(page, name, isFreshContext && retries === 0); } catch(e) {}
-    retries++;
+  // 1. Lazada
+  let results = [];
+  for (let retry = 0; retry < 2 && results.length === 0; retry++) {
+    try { results = await searchLazada(page, name); } catch (e) {}
+    if (results.length === 0 && retry < 1) await sleep(1500);
   }
-  console.log(`   Lazada: ${candidates.length}`);
 
-  if (candidates.length === 0) { console.log(`   ❌ Not on Lazada`); return null; }
+  if (results.length > 0) {
+    return { url: cleanUrl(results[0].url), source: "lazada", score: results[0].score };
+  }
 
-  const best = candidates[0];
-  console.log(`   ✅ ${best.url.substring(0, 90)}...`);
-  return best.url;
+  // 2. Blibli fallback
+  await sleep(1000);
+  try { results = await searchBlibli(page, name); } catch (e) {}
+
+  if (results.length > 0) {
+    return { url: results[0].url, source: "blibli", score: results[0].score };
+  }
+
+  return null;
 }
 
+// ── Generate JS mapping ────────────────────────────────────────────
 function genJs(m) {
   const entries = Object.entries(m).filter(([_, e]) => e.url);
-  const lines = [`/** Auto-generated — ${entries.length} product image URLs */`, 'const productImages = {'];
+  const lines = [`/** Auto-generated — ${entries.length} product image URLs */`, "const productImages = {"];
   for (const [id, entry] of entries) lines.push(`  "${id}":${JSON.stringify(entry)},`);
-  lines.push('};');
-  lines.push('function getProductImage(id){const e=productImages[id];return e&&e.url?e.url:null;}');
-  lines.push('function getImageStatus(id){const e=productImages[id];return e?e.status:"missing";}');
-  fs.writeFileSync(path.join(CFG.out, 'image-mapping.js'), lines.join('\n') + '\n', 'utf-8');
+  lines.push("};");
+  lines.push("function getProductImage(id){const e=productImages[id];return e&&e.url?e.url:null;}");
+  lines.push("function getImageStatus(id){const e=productImages[id];return e?e.status:\"missing\";}");
+  fs.writeFileSync(path.join(CFG.out, "image-mapping.js"), lines.join("\n") + "\n", "utf-8");
 }
 
+// ── Context factory ────────────────────────────────────────────────
+async function createContext(browser, ua) {
+  const ctx = await browser.newContext({
+    locale: "id-ID", timezoneId: "Asia/Jakarta",
+    viewport: { width: 1366, height: 768 },
+    userAgent: ua,
+    extraHTTPHeaders: {
+      "Accept-Language": "id-ID,id;q=0.9,en-US;q=0.8,en;q=0.7",
+      "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+    }
+  });
+  const p = await ctx.newPage();
+  await applyStealth(p);
+  return { ctx, page: p };
+}
+
+// ── Parallel worker ────────────────────────────────────────────────
+async function worker(browser, workerId, prods, sharedState) {
+  const uas = sharedState.userAgents;
+  let uaIdx = workerId;
+  let { ctx, page } = await createContext(browser, uas[uaIdx % uas.length]);
+
+  let ok = 0, lazOk = 0, bliOk = 0, fail = 0, consec = 0;
+  const ROTATE_EVERY = 50;
+  let rotations = 0;
+
+  for (let i = 0; i < prods.length; i++) {
+    const p = prods[i];
+
+    // Skip already-found
+    if (sharedState.m[p.id] && sharedState.m[p.id].url) continue;
+
+    // Periodic rotation
+    if (i > 0 && i % ROTATE_EVERY === 0) {
+      await ctx.close().catch(() => {});
+      uaIdx++;
+      ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
+      rotations++;
+      await sleep(1000);
+    }
+
+    // Rotation on 3 fails
+    if (consec >= 3) {
+      await ctx.close().catch(() => {});
+      uaIdx++;
+      ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
+      consec = 0;
+      rotations++;
+      await sleep(5000);
+    }
+
+    process.stdout.write(`\r[W${workerId}] ${i + 1}/${prods.length} | 📦 ${p.name.substring(0, 35)}...`);
+
+    const result = await findOne(page, p);
+
+    // Update shared state
+    if (result && result.url) {
+      sharedState.m[p.id] = { name: p.name, url: result.url, source: result.source, status: "found" };
+      ok++; if (result.source === "lazada") lazOk++; else bliOk++;
+      consec = 0;
+      sharedState.stats.ok++;
+      if (result.source === "lazada") sharedState.stats.lazOk++; else sharedState.stats.bliOk++;
+    } else {
+      sharedState.m[p.id] = { name: p.name, url: null, status: "failed" };
+      sharedState.fl.push({ id: p.id, name: p.name });
+      fail++; consec++;
+      sharedState.stats.fail++;
+    }
+    sharedState.stats.done++;
+
+    // Save progress
+    if (sharedState.stats.done % 20 === 0 || (result && result.url)) {
+      fs.writeFileSync(sharedState.mp, JSON.stringify(sharedState.m, null, 2), "utf-8");
+      fs.writeFileSync(sharedState.fp, JSON.stringify(sharedState.fl, null, 2), "utf-8");
+    }
+
+    process.stdout.write(`\r[W${workerId}] ${i + 1}/${prods.length} | ✅${ok} ❌${fail} | Total: ${sharedState.stats.done}/${sharedState.total}`);
+
+    if (i < prods.length - 1) {
+      await sleep(500 + Math.floor(Math.random() * CFG.delay));
+    }
+  }
+
+  await ctx.close().catch(() => {});
+  return { ok, fail, lazOk, bliOk };
+}
+
+// ── Main ───────────────────────────────────────────────────────────
 async function main() {
-  console.log('╔════════════════════════════════════════╗');
-  console.log('║  🔗 IMAGE URL FINDER — Lazada First  ║');
-  console.log('╚════════════════════════════════════════╝\n');
+  console.log("╔══════════════════════════════════════════╗");
+  console.log("║  🔗 IMAGE URL FINDER — Parallel Stealth ║");
+  console.log(`║  Workers: ${CFG.workers}                              ║`);
+  console.log("╚══════════════════════════════════════════╝\n");
 
   const all = readExcel();
   let prods = [...all];
-  if (CFG.mode === 'quick') prods = prods.slice(0, 10);
-  else if (CFG.mode === 'resume') {
-    const fp = path.join(CFG.out, '_failed.json');
-    if (fs.existsSync(fp)) prods = JSON.parse(fs.readFileSync(fp, 'utf-8')).map(f => all.find(x => x.id === f.id)).filter(Boolean);
+  if (CFG.mode === "quick") prods = prods.slice(0, 10);
+  else if (CFG.mode === "resume") {
+    const fp = path.join(CFG.out, "_failed.json");
+    if (fs.existsSync(fp)) {
+      prods = JSON.parse(fs.readFileSync(fp, "utf-8"))
+        .map(f => all.find(x => x.id === f.id)).filter(Boolean);
+    }
   }
-  console.log(`${CFG.mode === 'quick' ? '⚡ Quick: 10' : CFG.mode === 'resume' ? '🔄 Resume: ' + prods.length : '🔥 Full: ' + prods.length}\n`);
+  const total = prods.length;
+  console.log(`${CFG.mode === "quick" ? "⚡ Quick: 10" : CFG.mode === "resume" ? "🔄 Resume: " + total : "🔥 Full: " + total}\n`);
 
   if (!fs.existsSync(CFG.out)) fs.mkdirSync(CFG.out, { recursive: true });
 
-  const mp = path.join(CFG.out, '_mapping.json');
-  let m = fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, 'utf-8')) : {};
-  const fPath = path.join(CFG.out, '_failed.json');
-  let fl = fs.existsSync(fPath) ? JSON.parse(fs.readFileSync(fPath, 'utf-8')) : [];
+  const mp = path.join(CFG.out, "_mapping.json");
+  const fp = path.join(CFG.out, "_failed.json");
 
-  console.log('🚀 Launching Playwright...');
-  const { chromium } = require('playwright');
+  const sharedState = {
+    m: fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, "utf-8")) : {},
+    fl: fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, "utf-8")) : [],
+    stats: { ok: 0, lazOk: 0, bliOk: 0, fail: 0, done: 0 },
+    total,
+    lock: false,
+    mp, fp,
+    userAgents: [
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/130.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+      "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+    ],
+  };
+
+  // Filter out already-found products
+  let remaining = prods.filter(p => !sharedState.m[p.id] || !sharedState.m[p.id].url);
+  console.log(`📋 ${remaining.length}/${total} products to process\n`);
+
+  if (remaining.length === 0) {
+    console.log("✅ All products already have URLs!");
+    genJs(sharedState.m);
+    return;
+  }
+
+  console.log("🚀 Launching Playwright...");
+  const { chromium } = require("playwright");
   const browser = await chromium.launch({
     headless: true,
     args: [
-      '--no-sandbox',
-      '--disable-setuid-sandbox',
-      '--disable-dev-shm-usage',
-      '--disable-blink-features=AutomationControlled',
-      '--disable-features=IsolateOrigins,site-per-process',
+      "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+      "--disable-blink-features=AutomationControlled",
+      "--disable-features=IsolateOrigins,site-per-process",
     ]
   });
 
-  const userAgents = [
-    'Mozilla/5.0 (Linux; Android 13; SM-S908B) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1',
-    'Mozilla/5.0 (Linux; Android 14; Pixel 8 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Mobile Safari/537.36',
-    'Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1',
-  ];
-
-  let contextIdx = 0;
-  const makeContext = async () => {
-    if (contextIdx > 0) {
-      const pages = context.pages();
-      if (pages.length > 0) await pages[0].close().catch(() => {});
-      await context.close().catch(() => {});
-    }
-    const ua = userAgents[contextIdx % userAgents.length];
-    const ctx = await browser.newContext({
-      locale: 'id-ID',
-      timezoneId: 'Asia/Jakarta',
-      viewport: { width: 390 + Math.floor(Math.random() * 60), height: 844 + Math.floor(Math.random() * 40) },
-      userAgent: ua,
-    });
-    contextIdx++;
-    return { context: ctx, page: await ctx.newPage() };
-  };
-
-  let { context, page } = await makeContext();
-  const ROTATE_EVERY = 25; // fresh session every 25 products
-  console.log('✅ Ready!\n');
-
-  let ok = 0, fail = 0;
-  let consecutiveFails = 0;
-  for (let i = 0; i < prods.length; i++) {
-    const p = prods[i];
-    if (m[p.id] && m[p.id].url) { process.stdout.write(`\r⏭️  ${i+1}/${prods.length} ${p.name}`); continue; }
-
-    let isFreshContext = (i === 0);
-    if (i > 0 && i % ROTATE_EVERY === 0) {
-      console.log(`\n🔄 Rotating browser context (product ${i})...`);
-      const fresh = await makeContext();
-      context = fresh.context;
-      page = fresh.page;
-      isFreshContext = true;
-      await sleep(2000);
-    }
-
-    // If 3 consecutive fails, rotate context + longer pause
-    if (consecutiveFails >= 3) {
-      console.log(`\n⚠️  3 consecutive fails — rotating context & pausing...`);
-      const fresh = await makeContext();
-      context = fresh.context;
-      page = fresh.page;
-      consecutiveFails = 0;
-      isFreshContext = true;
-      await sleep(10000);
-    }
-
-    const url = await findOne(page, p, isFreshContext);
-    isFreshContext = false;
-    if (url) {
-      m[p.id] = { name: p.name, url, status: 'found' };
-      ok++;
-      consecutiveFails = 0;
-      // Save immediately on success — never lose more than 1
-      fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
-      fs.writeFileSync(fPath, JSON.stringify(fl, null, 2), 'utf-8');
-    } else {
-      fail++;
-      consecutiveFails++;
-      fl.push({ id: p.id, name: p.name });
-      m[p.id] = { name: p.name, url: null, status: 'failed' };
-    }
-    process.stdout.write(`\r📊 ${i+1}/${prods.length} | ✅ ${ok} | ❌ ${fail}`);
-
-    // Save progress every 10 products
-    if (i > 0 && i % 10 === 0) {
-      fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
-      fs.writeFileSync(fPath, JSON.stringify(fl, null, 2), 'utf-8');
-    }
-
-    if (i < prods.length - 1) {
-      const jitter = 1000 + Math.floor(Math.random() * (CFG.delay));
-      await sleep(jitter);
-    }
+  // Split products among workers
+  const workers = Math.min(CFG.workers, remaining.length);
+  const chunkSize = Math.ceil(remaining.length / workers);
+  const chunks = [];
+  for (let w = 0; w < workers; w++) {
+    chunks.push(remaining.slice(w * chunkSize, (w + 1) * chunkSize));
   }
 
+  console.log(`⚡ Starting ${workers} parallel workers (${chunks.map(c => c.length).join(", ")} products each)...\n`);
+
+  const startTime = Date.now();
+  const results = await Promise.allSettled(
+    chunks.map((chunk, idx) => worker(browser, idx, chunk, sharedState))
+  );
+
   await browser.close();
-  fs.writeFileSync(mp, JSON.stringify(m, null, 2), 'utf-8');
-  if (fail > 0) fs.writeFileSync(fPath, JSON.stringify(fl, null, 2), 'utf-8');
-  genJs(m);
-  console.log(`\n\n✅ ${ok} URLs | ❌ ${fail} failed`);
-  if (CFG.mode === 'quick') console.log(`\n🔥 Full: node scripts/find_image_urls.js --mode=full`);
-  if (fail > 0) console.log(`💡 Retry: node scripts/find_image_urls.js --mode=resume\n`);
+
+  // Final save
+  fs.writeFileSync(mp, JSON.stringify(sharedState.m, null, 2), "utf-8");
+  if (sharedState.fl.length > 0) fs.writeFileSync(fp, JSON.stringify(sharedState.fl, null, 2), "utf-8");
+  genJs(sharedState.m);
+
+  const elapsed = Math.round((Date.now() - startTime) / 1000);
+  const mins = Math.floor(elapsed / 60);
+  const secs = elapsed % 60;
+  console.log(`\n\n⏱️  ${mins}m ${secs}s | ✅ ${sharedState.stats.ok} URLs (L:${sharedState.stats.lazOk} B:${sharedState.stats.bliOk}) | ❌ ${sharedState.stats.fail} failed`);
+  if (CFG.mode === "quick") console.log(`🔥 Full run: node scripts/find_image_urls.js --mode=full`);
+  if (sharedState.fl.length > 0) console.log(`💡 Retry failed: node scripts/find_image_urls.js --mode=resume\n`);
 }
 
-main().catch(err => { console.error('\n❌ Fatal:', err); process.exit(1); });
+main().catch(err => { console.error("\n❌ Fatal:", err); process.exit(1); });
