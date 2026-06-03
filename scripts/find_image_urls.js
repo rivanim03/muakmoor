@@ -135,20 +135,77 @@ async function searchBlibli(page, productName) {
     .sort((a, b) => b.score - a.score);
 }
 
+// ── Shopee ─────────────────────────────────────────────────────────
+async function searchShopee(page, productName) {
+  const q = encodeURIComponent(productName);
+  try { await page.goto(`https://shopee.co.id/search?keyword=${q}`, { waitUntil: "domcontentloaded", timeout: 15000 }); }
+  catch (e) { return []; }
+  await sleep(2500);
+  await page.evaluate(() => window.scrollBy(0, 600));
+  await sleep(600);
+  const results = await page.evaluate(() => {
+    const found = [];
+    document.querySelectorAll("img").forEach(img => {
+      const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+      const alt = (img.getAttribute("alt") || "").trim();
+      if (!alt || alt.length < 3) return;
+      if (!src.includes("cf.shopee.co.id/file/") && !src.includes("shopee.co.id")) return;
+      if (/icon|logo|banner|avatar/i.test(alt)) return;
+      found.push({ url: src, alt });
+    });
+    return found;
+  });
+  return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
+    .sort((a, b) => b.score - a.score);
+}
+
+// ── Tokopedia ──────────────────────────────────────────────────────
+async function searchTokopedia(page, productName) {
+  const q = encodeURIComponent(productName);
+  try { await page.goto(`https://www.tokopedia.com/search?q=${q}`, { waitUntil: "domcontentloaded", timeout: 15000 }); }
+  catch (e) { return []; }
+  await sleep(2500);
+  await page.evaluate(() => window.scrollBy(0, 600));
+  await sleep(600);
+  const results = await page.evaluate(() => {
+    const found = [];
+    document.querySelectorAll("img").forEach(img => {
+      const src = img.getAttribute("src") || img.getAttribute("data-src") || "";
+      const alt = (img.getAttribute("alt") || "").trim();
+      if (!alt || alt.length < 3) return;
+      if (!src.includes("images.tokopedia.net/") && !src.includes("ecs7.tokopedia.net/")) return;
+      if (/icon|logo|banner|avatar|topads/i.test(alt)) return;
+      found.push({ url: src, alt });
+    });
+    return found;
+  });
+  return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
+    .sort((a, b) => b.score - a.score);
+}
+
 // ── Single product ─────────────────────────────────────────────────
 async function findOne(page, product) {
   const { name } = product;
-  let results = [];
-  for (let retry = 0; retry < 2 && results.length === 0; retry++) {
-    try { results = await searchLazada(page, name); } catch (e) {}
-    if (results.length === 0 && retry < 1) await sleep(1500);
+
+  const sources = [
+    { fn: searchLazada,    label: "lazada",    cleanUrl: true },
+    { fn: searchBlibli,    label: "blibli",    cleanUrl: false },
+    { fn: searchShopee,    label: "shopee",    cleanUrl: false },
+    { fn: searchTokopedia, label: "tokopedia", cleanUrl: false },
+  ];
+
+  for (const src of sources) {
+    let results = [];
+    for (let retry = 0; retry < 2 && results.length === 0; retry++) {
+      try { results = await src.fn(page, name); } catch (e) {}
+      if (results.length === 0 && retry < 1) await sleep(1500);
+    }
+    if (results.length > 0) {
+      const url = src.cleanUrl ? cleanUrl(results[0].url) : results[0].url;
+      return { url, source: src.label, score: results[0].score };
+    }
+    await sleep(1000);
   }
-  if (results.length > 0) return { url: cleanUrl(results[0].url), source: "lazada", score: results[0].score };
-
-  await sleep(1000);
-  try { results = await searchBlibli(page, name); } catch (e) {}
-  if (results.length > 0) return { url: results[0].url, source: "blibli", score: results[0].score };
-
   return null;
 }
 
@@ -258,7 +315,8 @@ async function main() {
 
   // ── Process ──
   const startTime = Date.now();
-  let ok = 0, lazOk = 0, bliOk = 0, fail = 0;
+  let ok = 0, fail = 0;
+  const bySource = {};
 
   for (let i = 0; i < prods.length; i++) {
     const p = prods[i];
@@ -268,7 +326,7 @@ async function main() {
 
     if (result && result.url) {
       m[p.id] = { name: p.name, url: result.url, source: result.source, status: "found" };
-      ok++; if (result.source === "lazada") lazOk++; else bliOk++;
+      ok++; bySource[result.source] = (bySource[result.source] || 0) + 1;
       console.log(`   ✅ ${result.source}: ${result.url.substring(0, 80)}...`);
     } else {
       m[p.id] = { name: p.name, url: null, status: "failed" };
@@ -296,7 +354,8 @@ async function main() {
   genJs(m);
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  console.log(`\n⏱️  ${Math.floor(elapsed / 60)}m ${elapsed % 60}s | ✅ ${ok} (L:${lazOk} B:${bliOk}) | ❌ ${fail}`);
+  const breakdown = Object.entries(bySource).map(([k,v]) => `${k}:${v}`).join(" ");
+  console.log(`\n⏱️  ${Math.floor(elapsed / 60)}m ${elapsed % 60}s | ✅ ${ok} (${breakdown}) | ❌ ${fail}`);
   console.log(`📊 Progress: ${foundCount + ok}/${totalAll} (${((foundCount + ok) / totalAll * 100).toFixed(1)}%)`);
   if (CFG.mode === "batch" && prods.length === CFG.batchSize) {
     console.log(`⏰ Next batch will continue from product #${foundCount + ok + 1}`);
