@@ -81,6 +81,16 @@ async function searchLazada(page, productName) {
   }
   await page.evaluate(() => window.scrollBy(0, 600));
   await sleep(400);
+
+  // ── Diagnostics ──
+  const diag = await page.evaluate(() => {
+    const title = document.title || "";
+    const allLazcdnImgs = document.querySelectorAll("img[src*=\"lazcdn.com\"]").length;
+    const productCards = document.querySelectorAll("[data-qa-locator=\"product-item\"], .Bm3ON, .RfADt").length;
+    const bodyText = (document.body?.innerText || "").substring(0, 200);
+    return { title, allLazcdnImgs, productCards, bodyText };
+  });
+
   const results = await page.evaluate(() => {
     const found = [];
     document.querySelectorAll("img[src*=\"lazcdn.com\"]").forEach(img => {
@@ -92,6 +102,12 @@ async function searchLazada(page, productName) {
     });
     return found;
   });
+
+  // Log diagnostics for debugging
+  if (results.length === 0) {
+    console.log(`   🔍 Diag: title="${diag.title.substring(0,60)}" | lazcdn imgs:${diag.allLazcdnImgs} | cards:${diag.productCards} | body:"${diag.bodyText.substring(0,80)}"`);
+  }
+
   return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
     .sort((a, b) => b.score - a.score);
 }
@@ -257,6 +273,11 @@ async function main() {
       fl.push({ id: p.id, name: p.name });
       fail++;
       console.log(`   ❌ Not found`);
+      // Screenshot on first failure for diagnostics
+      if (fail === 1) {
+        const shotPath = path.join(CFG.out, "_debug_screenshot.png");
+        try { await page.screenshot({ path: shotPath, fullPage: false }); console.log(`   📸 Screenshot saved: ${shotPath}`); } catch(e) {}
+      }
     }
 
     // Save after every product in batch mode (safety)
