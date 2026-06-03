@@ -188,21 +188,41 @@ async function main() {
   }
 
   // ── Browser ──
-  console.log("🚀 Launching Firefox...");
+  console.log("🚀 Launching browser...");
   const { chromium, firefox } = require("playwright");
-  let browser, browserType = "firefox";
+  let browser, browserType;
+
+  // Try real Chrome first (less detectable than Playwright Chromium)
   try {
-    browser = await firefox.launch({ headless: true });
-    console.log("✅ Firefox");
-  } catch (e) {
-    browserType = "chromium";
     browser = await chromium.launch({
+      channel: "chrome",  // uses system-installed Google Chrome
       headless: true,
-      args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
-             "--disable-blink-features=AutomationControlled",
-             "--disable-features=IsolateOrigins,site-per-process"]
+      args: [
+        "--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+        "--disable-blink-features=AutomationControlled",
+      ],
+      ignoreDefaultArgs: ["--enable-automation"],
     });
-    console.log("⚠️  Chromium (Firefox not available)");
+    browserType = "chrome";
+    console.log("✅ Google Chrome");
+  } catch (e) {
+    // Fallback: Firefox
+    try {
+      browser = await firefox.launch({ headless: true });
+      browserType = "firefox";
+      console.log("⚠️  Firefox (Chrome not available)");
+    } catch (e2) {
+      // Last resort: Playwright Chromium
+      browser = await chromium.launch({
+        headless: true,
+        args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage",
+               "--disable-blink-features=AutomationControlled",
+               "--disable-features=IsolateOrigins,site-per-process"],
+        ignoreDefaultArgs: ["--enable-automation"],
+      });
+      browserType = "chromium";
+      console.log("❌ Playwright Chromium (Chrome & Firefox unavailable)");
+    }
   }
 
   const ctx = await browser.newContext({
