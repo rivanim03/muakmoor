@@ -12,10 +12,9 @@ Thumbs.db
 # Environment
 .env
 
-# Downloaded images & generated data (run Download Gambar Produk.bat)
+# Downloaded images (not needed in repo)
 assets/images/*.jpg
 assets/images/*.svg
 assets/images/*.png
-assets/images/_mapping.json
-assets/images/_failed.json
-# image-mapping.js is tracked — starts as stub, populated by downloader
+# _mapping.json and _failed.json ARE tracked — needed for resume
+# image-mapping.js is tracked — starts as stub, populated by scraper
