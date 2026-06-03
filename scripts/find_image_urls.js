@@ -1,11 +1,11 @@
-﻿/**
+/**
  * MAKMUR GROSIR - IMAGE URL FINDER (STEALTH + PARALLEL)
  * Searches Lazada + Blibli for product image URLs.
- * Uses 3 parallel workers to process 2,781 products in ~2 hours.
+ * Uses 2 parallel workers with human-like pacing to avoid rate limits.
  *
  * node scripts/find_image_urls.js --mode=quick   (test 10)
- * node scripts/find_image_urls.js --mode=full    (all 2,781 — parallel)
- * node scripts/find_image_urls.js --mode=resume  (retry failed — parallel)
+ * node scripts/find_image_urls.js --mode=full    (all 2,781)
+ * node scripts/find_image_urls.js --mode=resume  (retry failed)
  */
 
 const fs = require("fs");
@@ -15,14 +15,13 @@ const XLSX = require("xlsx");
 const CFG = {
   excel: path.join(__dirname, "..", "Daftar Produk.xlsx"),
   out: path.join(__dirname, "..", "assets", "images"),
-  delay: process.env.CI ? 2000 : 1000,
+  delay: process.env.CI ? 5000 : 1000,
   mode: process.argv.find(a => a.startsWith("--mode="))?.split("=")[1] || "full",
-  workers: process.env.CI ? 3 : 2,  // 3 parallel in CI, 2 locally
+  workers: process.env.CI ? 2 : 2,
 };
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// ── Excel ──────────────────────────────────────────────────────────
 function readExcel() {
   console.log("📖 Reading Excel...");
   const wb = XLSX.readFile(CFG.excel);
@@ -38,7 +37,6 @@ function readExcel() {
   return out;
 }
 
-// ── Scoring ────────────────────────────────────────────────────────
 function matchScore(productName, altText) {
   const p = productName.toLowerCase(), a = altText.toLowerCase();
   let m = 0;
@@ -50,23 +48,11 @@ function cleanUrl(url) {
   return url.replace(/(\.(?:jpg|jpeg|png|webp))[_.].*$/i, "$1");
 }
 
-// ── Stealth ────────────────────────────────────────────────────────
 async function applyStealth(page) {
   await page.addInitScript(() => {
-    // 1. Hide webdriver
     Object.defineProperty(navigator, "webdriver", { get: () => false });
-
-    // 2. Fake chrome runtime (won't hurt on Firefox)
     try { window.chrome = { runtime: {} }; } catch(e) {}
-
-    // 3. Fake plugins (safe: no PluginArray dependency)
-    try {
-      Object.defineProperty(navigator, "plugins", {
-        get: () => [1, 2, 3, 4, 5]  // length=5 looks real
-      });
-    } catch(e) {}
-
-    // 4. Permissions
+    try { Object.defineProperty(navigator, "plugins", { get: () => [1, 2, 3, 4, 5] }); } catch(e) {}
     try {
       const origQuery = navigator.permissions.query.bind(navigator.permissions);
       navigator.permissions.query = (params) =>
@@ -74,22 +60,15 @@ async function applyStealth(page) {
           ? Promise.resolve({ state: Notification.permission, onchange: null })
           : origQuery(params);
     } catch(e) {}
-
-    // 5. Languages
     try { Object.defineProperty(navigator, "languages", { get: () => ["id-ID", "id", "en-US", "en"] }); } catch(e) {}
-
-    // 6. Hardware
     try { Object.defineProperty(navigator, "hardwareConcurrency", { get: () => 8 }); } catch(e) {}
     try { Object.defineProperty(navigator, "deviceMemory", { get: () => 8 }); } catch(e) {}
   });
 }
 
-// ── Lazada ─────────────────────────────────────────────────────────
 async function searchLazada(page, productName) {
   const q = encodeURIComponent(productName);
   const url = `https://www.lazada.co.id/catalog/?q=${q}`;
-
-  // Fast: domcontentloaded first, networkidle only on retry
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       await page.goto(url, {
@@ -103,11 +82,8 @@ async function searchLazada(page, productName) {
       await sleep(2000);
     }
   }
-
-  // Quick scroll to trigger lazy images
   await page.evaluate(() => window.scrollBy(0, 600));
   await sleep(400);
-
   const results = await page.evaluate(() => {
     const found = [];
     document.querySelectorAll("img[src*=\"lazcdn.com\"]").forEach(img => {
@@ -119,12 +95,10 @@ async function searchLazada(page, productName) {
     });
     return found;
   });
-
   return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
     .sort((a, b) => b.score - a.score);
 }
 
-// ── Blibli ─────────────────────────────────────────────────────────
 async function searchBlibli(page, productName) {
   const q = encodeURIComponent(productName);
   try {
@@ -132,11 +106,9 @@ async function searchBlibli(page, productName) {
       waitUntil: "domcontentloaded", timeout: 15000
     });
   } catch (e) { return []; }
-
   await sleep(2000);
   await page.evaluate(() => window.scrollBy(0, 800));
   await sleep(600);
-
   const results = await page.evaluate(() => {
     const found = [];
     document.querySelectorAll("img[src*=\"static-src.com/wcsstore\"]").forEach(img => {
@@ -148,38 +120,28 @@ async function searchBlibli(page, productName) {
     });
     return found;
   });
-
   return results.map(r => ({ ...r, score: matchScore(productName, r.alt) }))
     .sort((a, b) => b.score - a.score);
 }
 
-// ── Single product ─────────────────────────────────────────────────
 async function findOne(page, product) {
   const { name } = product;
-
-  // 1. Lazada
   let results = [];
   for (let retry = 0; retry < 2 && results.length === 0; retry++) {
     try { results = await searchLazada(page, name); } catch (e) {}
     if (results.length === 0 && retry < 1) await sleep(1500);
   }
-
   if (results.length > 0) {
     return { url: cleanUrl(results[0].url), source: "lazada", score: results[0].score };
   }
-
-  // 2. Blibli fallback
   await sleep(1000);
   try { results = await searchBlibli(page, name); } catch (e) {}
-
   if (results.length > 0) {
     return { url: results[0].url, source: "blibli", score: results[0].score };
   }
-
   return null;
 }
 
-// ── Generate JS mapping ────────────────────────────────────────────
 function genJs(m) {
   const entries = Object.entries(m).filter(([_, e]) => e.url);
   const lines = [`/** Auto-generated — ${entries.length} product image URLs */`, "const productImages = {"];
@@ -190,7 +152,6 @@ function genJs(m) {
   fs.writeFileSync(path.join(CFG.out, "image-mapping.js"), lines.join("\n") + "\n", "utf-8");
 }
 
-// ── Context factory ────────────────────────────────────────────────
 async function createContext(browser, ua) {
   const ctx = await browser.newContext({
     locale: "id-ID", timezoneId: "Asia/Jakarta",
@@ -206,46 +167,48 @@ async function createContext(browser, ua) {
   return { ctx, page: p };
 }
 
-// ── Parallel worker ────────────────────────────────────────────────
 async function worker(browser, workerId, prods, sharedState) {
   const uas = sharedState.userAgents;
   let uaIdx = workerId;
   let { ctx, page } = await createContext(browser, uas[uaIdx % uas.length]);
-
   let ok = 0, lazOk = 0, bliOk = 0, fail = 0, consec = 0;
-  const ROTATE_EVERY = 50;
-  let rotations = 0;
+  const ROTATE_EVERY = 12;
+  const BREAK_EVERY = 7;
 
   for (let i = 0; i < prods.length; i++) {
     const p = prods[i];
-
-    // Skip already-found
     if (sharedState.m[p.id] && sharedState.m[p.id].url) continue;
 
-    // Periodic rotation
+    // Periodic fresh session
     if (i > 0 && i % ROTATE_EVERY === 0) {
       await ctx.close().catch(() => {});
       uaIdx++;
       ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
-      rotations++;
-      await sleep(1000);
+      await sleep(3000 + Math.random() * 4000);
     }
 
-    // Rotation on 3 fails
-    if (consec >= 3) {
+    // Human-like coffee break: visit homepage, pause 15-35s, fresh session
+    if (i > 0 && i % BREAK_EVERY === 0) {
+      console.log(`\n[W${workerId}] ☕ coffee break...`);
+      try { await page.goto("https://www.lazada.co.id/", { waitUntil: "domcontentloaded", timeout: 10000 }); } catch(e) {}
+      await sleep(15000 + Math.random() * 20000);
+      await ctx.close().catch(() => {});
+      uaIdx++;
+      ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
+    }
+
+    // 2 consecutive fails = fresh session + long pause
+    if (consec >= 2) {
       await ctx.close().catch(() => {});
       uaIdx++;
       ({ ctx, page } = await createContext(browser, uas[uaIdx % uas.length]));
       consec = 0;
-      rotations++;
-      await sleep(5000);
+      await sleep(10000 + Math.random() * 10000);
     }
 
     process.stdout.write(`\r[W${workerId}] ${i + 1}/${prods.length} | 📦 ${p.name.substring(0, 35)}...`);
-
     const result = await findOne(page, p);
 
-    // Update shared state
     if (result && result.url) {
       sharedState.m[p.id] = { name: p.name, url: result.url, source: result.source, status: "found" };
       ok++; if (result.source === "lazada") lazOk++; else bliOk++;
@@ -261,7 +224,6 @@ async function worker(browser, workerId, prods, sharedState) {
     }
     sharedState.stats.done++;
 
-    // Save progress
     if (sharedState.stats.done % 20 === 0 || (result && result.url)) {
       fs.writeFileSync(sharedState.mp, JSON.stringify(sharedState.m, null, 2), "utf-8");
       fs.writeFileSync(sharedState.fp, JSON.stringify(sharedState.fl, null, 2), "utf-8");
@@ -270,7 +232,7 @@ async function worker(browser, workerId, prods, sharedState) {
     process.stdout.write(`\r[W${workerId}] ${i + 1}/${prods.length} | ✅${ok} ❌${fail} | Total: ${sharedState.stats.done}/${sharedState.total}`);
 
     if (i < prods.length - 1) {
-      await sleep(500 + Math.floor(Math.random() * CFG.delay));
+      await sleep(2000 + Math.floor(Math.random() * CFG.delay));
     }
   }
 
@@ -278,7 +240,6 @@ async function worker(browser, workerId, prods, sharedState) {
   return { ok, fail, lazOk, bliOk };
 }
 
-// ── Main ───────────────────────────────────────────────────────────
 async function main() {
   console.log("╔══════════════════════════════════════════╗");
   console.log("║  🔗 IMAGE URL FINDER — Parallel Stealth ║");
@@ -308,7 +269,6 @@ async function main() {
     fl: fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, "utf-8")) : [],
     stats: { ok: 0, lazOk: 0, bliOk: 0, fail: 0, done: 0 },
     total,
-    lock: false,
     mp, fp,
     userAgents: [
       "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
@@ -318,7 +278,6 @@ async function main() {
     ],
   };
 
-  // Filter out already-found products
   let remaining = prods.filter(p => !sharedState.m[p.id] || !sharedState.m[p.id].url);
   console.log(`📋 ${remaining.length}/${total} products to process\n`);
 
@@ -349,7 +308,6 @@ async function main() {
   }
   console.log(`🔧 Using ${browserType}\n`);
 
-  // Split products among workers
   const workers = Math.min(CFG.workers, remaining.length);
   const chunkSize = Math.ceil(remaining.length / workers);
   const chunks = [];
@@ -360,20 +318,17 @@ async function main() {
   console.log(`⚡ Starting ${workers} parallel workers (${chunks.map(c => c.length).join(", ")} products each)...\n`);
 
   const startTime = Date.now();
-  const results = await Promise.allSettled(
+  await Promise.allSettled(
     chunks.map((chunk, idx) => worker(browser, idx, chunk, sharedState))
   );
-
   await browser.close();
 
-  // Final save
   fs.writeFileSync(mp, JSON.stringify(sharedState.m, null, 2), "utf-8");
   if (sharedState.fl.length > 0) fs.writeFileSync(fp, JSON.stringify(sharedState.fl, null, 2), "utf-8");
   genJs(sharedState.m);
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
-  const mins = Math.floor(elapsed / 60);
-  const secs = elapsed % 60;
+  const mins = Math.floor(elapsed / 60), secs = elapsed % 60;
   console.log(`\n\n⏱️  ${mins}m ${secs}s | ✅ ${sharedState.stats.ok} URLs (Lazada:${sharedState.stats.lazOk} Blibli:${sharedState.stats.bliOk}) | ❌ ${sharedState.stats.fail} failed`);
   if (CFG.mode === "quick") console.log(`🔥 Full run: node scripts/find_image_urls.js --mode=full`);
   if (sharedState.fl.length > 0) console.log(`💡 Retry failed: node scripts/find_image_urls.js --mode=resume\n`);
