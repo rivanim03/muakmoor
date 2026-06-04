@@ -1,252 +1,302 @@
 {
   "1": {
     "name": "ABC BATERAI JAM",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/36309cfaa578d37adbd93f30951167ce.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "2": {
     "name": "ABC BATERAI REMOT",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/36309cfaa578d37adbd93f30951167ce.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "3": {
     "name": "ABC BATERAI REMOT HITAM",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S3a668b39130442e880824e30bd8e9e76w.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "4": {
     "name": "ABC BOTOL CHOCOMALT",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S594c6ff512dd4d2cb8af98f864fd6f85u.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "5": {
     "name": "ABC GULA AREN",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sf45b833410db48b1aa39fc68c9614e4e9.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "6": {
     "name": "ABC KECAP 250G",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/0945e57faea9083215d9c184f333dc7a.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "7": {
     "name": "ABC KECAP 600G",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/0fee286f89d26541b442bc6bcfaff148.png",
+    "source": "lazada",
+    "status": "found"
   },
   "8": {
     "name": "ABC KECAP 62G B3G1",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S5467db5d0ac944e7b69e054eeec037b2h.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "9": {
     "name": "ABC KECAP 685G",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/c2af3a5284b6d0069b5c091362d25e2f.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "10": {
     "name": "ABC KECAP ASIN BOTOL 131ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sd498cd85a9a949069af34c03e9cc56bbv.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "11": {
     "name": "ABC KECAP BOTOL 130ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/75d9edb80b370ac1acbbcb739e8fc0d6.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "12": {
     "name": "ABC KECAP BOTOL 275ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/753468043625c137b36605918bae5e31.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "13": {
     "name": "ABC KECAP BOTOL PEDAS 275ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/753468043625c137b36605918bae5e31.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "14": {
     "name": "ABC KECAP HITAM 62G B2G1",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/33a0ffdc9e7f95e1fc4fcd5a97ecb89d.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "15": {
     "name": "ABC KECAP R",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sfe7f10388a5b4d59bd4c718d10dab509G.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "16": {
     "name": "ABC MIE AYAM BAWANG",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S3aff0439a5ea4d349b486689bfd62866P.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "17": {
     "name": "ABC MIX",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/5a41a7fe38080b2bb42990fd554e2620.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "18": {
     "name": "ABC MOCA",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S08e0976cb13e4d7ca23e39e0ccf72c5bZ.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "19": {
     "name": "ABC PLUS",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S414098d31ea04e4da56dedd69cded74eK.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "20": {
     "name": "ABC SAMBAL 65G ASLI",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/5f4362ff54852eab6ee78cd54b4eaf7c.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "21": {
     "name": "ABC SAMBAL 65G EXTRA PEDAS",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/2e6bf1c672ad01beef47855f7ce3d25f.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "22": {
     "name": "ABC SAMBAL ASLI NUSANTARA R",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/09ba64bd1fc43ec2bec1fe33c2a35f45.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "23": {
     "name": "ABC SAMBAL ASLI STIK",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sbe4019fddc624f30879ca05fbf747eb74.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "24": {
     "name": "ABC SAMBAL BOTOL 130ML ASLI",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/5bced82df585ee6550d6079b5306a1e4.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "25": {
     "name": "ABC SAMBAL BOTOL 130ML EXTRA PEDAS",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S259e3cb7a4c1463c9445fb1e37ebd89bH.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "26": {
     "name": "ABC SAMBAL BOTOL 130ML EXTREME PEDAS",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S259e3cb7a4c1463c9445fb1e37ebd89bH.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "27": {
     "name": "ABC SAMBAL BOTOL 270ML ASLI",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/0fe360a11244398e4ada62f06221887f.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "28": {
     "name": "ABC SAMBAL BOTOL 270ML EXTRA PEDAS",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/bb3dbce2c045366797b31d5a5b284960.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "29": {
     "name": "ABC SAMBAL BOTOL 270ML EXTREME PEDAS",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/bb3dbce2c045366797b31d5a5b284960.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "30": {
     "name": "ABC SAMBAL EXTRA PEDAS R",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/000891b85cb051f80c1a29ffa33d009e.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "31": {
     "name": "ABC SAMBAL EXTRA PEDAS STIK",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S2152e0f3d06648c3ba9e37faad5b8bfco.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "32": {
     "name": "ABC SAMBAL TERASI R",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sf8030722f457444089b705478d856a2a0.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "33": {
     "name": "ABC SAMBAL TOMAT BOTOL 130ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/ae684ed0f537dbce4a05f82b9ad618da.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "34": {
     "name": "ABC SAMBAL TOMAT BOTOL 270ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/8fd97ae28deaec45767e991f649de72d.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "35": {
     "name": "ABC SAMBAL TOMAT STIK",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/002a4104889d46f0d4b3553a5c07cd22.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "36": {
     "name": "ABC SIRUP SQUASH JERUK",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/bb22a9791f2ad7935bd6efd37a090de3.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "37": {
     "name": "ABC SUSU",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sdaec898a6c1842c99a4d9d3dde7efb6dp.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "38": {
     "name": "ABC TERASI UDANG PAK",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Se520d901adf348bfb89de9bc2fd6cf20y.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "39": {
     "name": "ABON 100G",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sf5499c416cca4b85a67b1442f6949a39E.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "40": {
     "name": "ABON 32",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sc2cb70379470483bac91085620a863ebQ.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "41": {
     "name": "ABON 50G",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S063e7b6801564d5fa50d16edc8ffb158u.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "42": {
     "name": "ABON CUP",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S2b35f1ea3cee42d6ba66bd144b80081am.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "43": {
     "name": "ACI",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S4271ad748d60478996d7fb2c63e3ebf1Z.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "44": {
     "name": "ADEM SARI CHINGKU BOTOL",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/66adc07ab8382f553f58c3e176c593e2.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "45": {
     "name": "ADEM SARI CHINGKU KALENG",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S88d0f16c487148b594fc33779334bf6a9.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "46": {
     "name": "ADEM SARI SAC",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/S99f594a991464ebab4a705464fa2b505Q.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "47": {
     "name": "AGARIA COKLAT",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/a1b7850cd252f77c851da5f954d2ba62.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "48": {
     "name": "AGUNG 1000",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/42e1d62b81528cff0e1cc5016d22d879.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "49": {
     "name": "AGUNG 2000",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/p/62f9d86b24dce8ff0995a4c068688851.jpg",
+    "source": "lazada",
+    "status": "found"
   },
   "50": {
     "name": "AGUNG CAIR 450ML",
-    "url": null,
-    "status": "failed"
+    "url": "https://img.lazcdn.com/g/ff/kf/Sc93bb6848d604d039a79572dcf27a6f9O.jpg",
+    "source": "lazada",
+    "status": "found"
   }
 }
