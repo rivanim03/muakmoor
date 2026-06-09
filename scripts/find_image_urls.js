@@ -11,10 +11,11 @@
 
 const fs = require("fs");
 const path = require("path");
-const XLSX = require("xlsx");
+
+// Load product list from products-data.js (single source of truth for IDs)
+const { products: allProducts } = require(path.join(__dirname, "..", "products-data.js"));
 
 const CFG = {
-  excel: path.join(__dirname, "..", "Daftar Produk.xlsx"),
   out: path.join(__dirname, "..", "assets", "images"),
   delay: process.env.CI ? 3000 : 1000,
   batchSize: 50,
@@ -23,19 +24,10 @@ const CFG = {
 
 const sleep = ms => new Promise(r => setTimeout(r, ms));
 
-// ── Excel ──────────────────────────────────────────────────────────
-function readExcel() {
-  console.log("📖 Reading Excel...");
-  const wb = XLSX.readFile(CFG.excel);
-  const ws = wb.Sheets["Sheet"];
-  const data = XLSX.utils.sheet_to_json(ws, { defval: "", header: 1 });
-  const out = [];
-  for (let i = 1; i < data.length; i++) {
-    const n = (data[i][1] || "").trim();
-    if (!n || out.find(x => x.name.toUpperCase() === n.toUpperCase())) continue;
-    out.push({ id: out.length + 1, name: n });
-  }
-  return out;
+// ── Product list from products-data.js ────────────────────────────
+function getProductList() {
+  console.log(`📖 Loading ${allProducts.length} products from products-data.js...`);
+  return allProducts.map(p => ({ id: p.id, name: p.name }));
 }
 
 // ── Scoring ────────────────────────────────────────────────────────
@@ -225,8 +217,15 @@ function genJs(m) {
 }
 
 // ── Main ───────────────────────────────────────────────────────────
+// ── Action log ─────────────────────────────────────────────────────
+function appendActionLog(entry) {
+  const logPath = path.join(CFG.out, "_action.log");
+  const line = JSON.stringify(entry) + "\n";
+  fs.appendFileSync(logPath, line, "utf-8");
+}
+
 async function main() {
-  const all = readExcel();
+  const all = getProductList();
   const totalAll = all.length;
   const mp = path.join(CFG.out, "_mapping.json");
   const fp = path.join(CFG.out, "_failed.json");
@@ -234,6 +233,15 @@ async function main() {
 
   let m = fs.existsSync(mp) ? JSON.parse(fs.readFileSync(mp, "utf-8")) : {};
   let fl = fs.existsSync(fp) ? JSON.parse(fs.readFileSync(fp, "utf-8")) : [];
+
+  // Deduplicate failed list (remove duplicate entries with same id)
+  const seenIds = new Set();
+  fl = fl.filter(f => {
+    if (seenIds.has(f.id)) return false;
+    seenIds.add(f.id);
+    return true;
+  });
+
   const foundCount = Object.values(m).filter(e => e && e.url).length;
 
   // ── Pick products ──
@@ -334,7 +342,10 @@ async function main() {
       console.log(`   ✅ ${result.source}: ${result.url.substring(0, 80)}...`);
     } else {
       m[p.id] = { name: p.name, url: null, status: "failed" };
-      fl.push({ id: p.id, name: p.name });
+      // Only push to failed list if not already there (dedup)
+      if (!fl.some(f => f.id === p.id)) {
+        fl.push({ id: p.id, name: p.name });
+      }
       fail++;
       console.log(`   ❌ Not found`);
       // Screenshot on first failure for diagnostics
@@ -364,6 +375,18 @@ async function main() {
   if (CFG.mode === "batch" && prods.length === CFG.batchSize) {
     console.log(`⏰ Next batch will continue from product #${foundCount + ok + 1}`);
   }
+
+  // ── Action log ──
+  appendActionLog({
+    timestamp: new Date().toISOString(),
+    mode: CFG.mode,
+    attempted: prods.length,
+    succeeded: ok,
+    failed: fail,
+    sources: bySource,
+    totalProgress: foundCount + ok,
+    totalProducts: totalAll,
+  });
 }
 
 main().catch(err => { console.error("\n❌ Fatal:", err); process.exit(1); });
