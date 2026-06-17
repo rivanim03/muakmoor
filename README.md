@@ -1,25 +1,25 @@
 # 🛒 Makmur Grosir
 
-**Toko Grosir Online** — A simple, fast, mobile-friendly web store for browsing wholesale prices and placing orders directly via WhatsApp.
+**Toko Grosir Online** — Website sederhana, cepat, dan ramah HP untuk melihat harga grosir dan memesan langsung via WhatsApp.
 
-Customers can browse **2,500+ products** across 9 categories, search by name, add items to a cart, and send the complete order as a single WhatsApp message to the store owner — no app install needed.
-
----
-
-## ✨ Features
-
-- **📦 2,500+ Products** — Organized into 9 categories (food, drinks, spices, instant food, medicine, tobacco, soap, diapers, tools)
-- **🔍 Live Search** — Filter products by name as you type
-- **📱 Cart System** — Add/remove items, adjust quantities, persistent across page reloads
-- **💬 WhatsApp Checkout** — One tap sends the entire order (with prices & totals) to the owner
-- **🌙 Dark Mode** — Toggleable light/dark theme
-- **🖼️ Auto Image Mapping** — Product images are automatically mined from e-commerce sites via GitHub Actions
-- **⚡ Lazy Loading** — Images load on demand; falls back to category emoji if unavailable
-- **📄 Pagination** — 30 products per page with category filtering
+Pelanggan bisa browsing **2.500+ produk** dalam 9 kategori, mencari berdasarkan nama, menambah ke keranjang, dan mengirim seluruh pesanan sebagai satu pesan WhatsApp ke pemilik toko — tanpa perlu install aplikasi.
 
 ---
 
-## 🧠 How It Works
+## ✨ Fitur
+
+- **📦 2.500+ Produk** — Terbagi dalam 9 kategori (alat, makanan, minuman, bumbu, instanfood, obat, rokok, sabun, pampers)
+- **🔍 Pencarian Langsung** — Filter produk berdasarkan nama saat mengetik
+- **📱 Keranjang Belanja** — Tambah/hapus item, atur jumlah, tersimpan walau halaman di-refresh
+- **💬 Checkout WhatsApp** — Satu klik kirim seluruh pesanan (dengan harga & total) ke pemilik toko
+- **🌙 Mode Gelap** — Beralih tema terang/gelap
+- **🖼️ Pencarian Gambar Otomatis** — Gambar produk dicari otomatis dari situs e-commerce via GitHub Actions
+- **⚡ Lazy Loading** — Gambar dimuat sesuai kebutuhan; fallback ke emoji kategori jika tidak tersedia
+- **📄 Paginasi** — 30 produk per halaman dengan filter kategori
+
+---
+
+## 🧠 Cara Kerja
 
 ```
 📊 Excel (.xlsx) ──► generate_website_data.js ──► products-data.js (JSON)
@@ -28,35 +28,35 @@ Customers can browse **2,500+ products** across 9 categories, search by name, ad
                     │                                     │
                     ▼                                     ▼
           find_image_urls.js                      index.html + script.js
-          (GitHub Action)                         (Customer-facing site)
+          (GitHub Action)                         (Tampilan pembeli)
                     │
                     ▼
           _mapping.json + image-mapping.js
-          (correct product-ID-to-URL mapping)
+          (pasangan ID-produk → URL gambar)
 ```
 
-### 🔄 Image Mining Pipeline (GitHub Actions)
+### 🔄 Pipeline Pencarian Gambar (GitHub Actions)
 
-The project includes an automated scraper that finds product images from **Lazada, Blibli, Shopee, and Tokopedia**:
+Proyek ini memiliki scraper otomatis yang mencari gambar produk dari **Lazada, Blibli, Shopee, dan Tokopedia**:
 
-1. **Product data** is generated from an Excel spreadsheet into `products-data.js`
-2. A **Playwright bot** (`scripts/find_image_urls.js`) searches each product on 4 e-commerce sites
-3. Images are scored by alt-text similarity, and the best match is saved to `_mapping.json`
-4. Results are accumulated across runs — **50 products per batch, every 3 hours**
-5. A live `_action.log` tracks every run's progress, successes, and failures
+1. **Data produk** dibuat dari spreadsheet Excel ke `products-data.js`
+2. **Bot Playwright** (`scripts/find_image_urls.js`) mencari setiap produk di 4 situs e-commerce
+3. Gambar dinilai berdasarkan kesamaan alt-text, dan yang terbaik disimpan ke `_mapping.json`
+4. Hasil dikumpulkan dari setiap proses — **50 produk per batch, setiap 3 jam**
+5. File `_action.log` mencatat progres, keberhasilan, dan kegagalan setiap proses
 
-> 💡 *The "muakmoor" name comes from the original Excel filename — a playful take on "Makmur Grosir".*
+> 💡 *Nama "muakmoor" berasal dari nama file Excel asli — plesetan dari "Makmur Grosir".*
 
 ---
 
-## 🚀 Getting Started
+## 🚀 Memulai
 
-### Prerequisites
+### Prasyarat
 
 - [Node.js](https://nodejs.org/) v18+
 - npm
 
-### Installation
+### Instalasi
 
 ```bash
 git clone https://github.com/rivanim03/muakmoor.git
@@ -64,71 +64,71 @@ cd muakmoor
 npm install
 ```
 
-### Run the Website (Locally)
+### Menjalankan Website (Lokal)
 
-Open `index.html` directly in a browser, or serve with any static server:
+Buka `index.html` langsung di browser, atau gunakan static server:
 
 ```bash
 npx serve .
 ```
 
-### Run the Image Finder
+### Menjalankan Pencari Gambar
 
 ```bash
-# Test with 10 products
+# Uji coba dengan 10 produk
 npm run urls:test
 
-# Process all pending products (batch of 50)
+# Proses semua produk yang belum memiliki gambar (batch 50)
 npm run urls:all
 
-# Retry previously failed products
+# Ulangi produk yang sebelumnya gagal
 npm run urls:resume
 ```
 
 ---
 
-## 📁 Project Structure
+## 📁 Struktur Proyek
 
 ```
 muakmoor/
-├── index.html                 # Main storefront page
-├── style.css                  # Responsive styling
-├── script.js                  # Cart, search, UI logic
-├── products-data.js           # 2,500+ products with pricing
-├── package.json               # Dependencies & scripts
+├── index.html                 # Halaman utama toko
+├── style.css                  # Styling responsif
+├── script.js                  # Logika keranjang, pencarian, UI
+├── products-data.js           # 2.500+ produk dengan harga
+├── package.json               # Dependensi & script
 │
 ├── scripts/
-│   ├── find_image_urls.js     # Playwright image scraper (GitHub Action)
-│   └── migrate_mapping.js     # One-time ID re-indexing migration
+│   ├── find_image_urls.js     # Scraper gambar Playwright (GitHub Action)
+│   └── migrate_mapping.js     # Migrasi perbaikan ID (satu kali)
 │
 ├── .github/workflows/
-│   └── find-image-urls.yml    # Scheduled GitHub Action (every 3h)
+│   └── find-image-urls.yml    # GitHub Action terjadwal (setiap 3 jam)
 │
 ├── assets/images/
-│   ├── _mapping.json          # Product-ID → image URL mapping
-│   ├── _failed.json           # Products needing retry
-│   ├── _action.log            # Run history log
-│   └── image-mapping.js       # Auto-generated JS mapping (for the site)
+│   ├── _mapping.json          # Pasangan ID-produk → URL gambar
+│   ├── _failed.json           # Produk yang perlu diulang
+│   ├── _action.log            # Riwayat proses
+│   └── image-mapping.js       # JS mapping otomatis (untuk website)
 │
 └── DataBaseFormxlsx/
-    ├── generate_website_data.js   # Excel → products-data.js converter
-    └── generate_template.js       # Excel template generator
+    ├── generate_website_data.js   # Konverter Excel → products-data.js
+    └── generate_template.js       # Pembuat template Excel
 ```
 
 ---
 
 ## 🛠️ Tech Stack
 
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | HTML, CSS, Vanilla JS (no frameworks) |
+| Lapisan | Teknologi |
+|---------|-----------|
+| **Frontend** | HTML, CSS, Vanilla JS (tanpa framework) |
 | **Data** | Excel → `products-data.js` (JSON) |
 | **Scraping** | Playwright (Chromium/Firefox) |
-| **Automation** | GitHub Actions (scheduled + manual) |
+| **Otomatisasi** | GitHub Actions (terjadwal + manual) |
 | **Checkout** | WhatsApp API (`wa.me`) |
 
 ---
 
-## 📄 License
+## 📄 Lisensi
 
 ISC
