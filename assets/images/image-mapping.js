@@ -1,4 +1,4 @@
-/** Auto-generated — 1943 product image URLs */
+/** Auto-generated - 1953 product image URLs */
 const productImages = {
   "1":{"name":"ABC BATERAI JAM","url":"https://img.lazcdn.com/g/p/36309cfaa578d37adbd93f30951167ce.jpg","source":"lazada","status":"found"},
   "2":{"name":"ABC BATERAI REMOT","url":"https://img.lazcdn.com/g/p/36309cfaa578d37adbd93f30951167ce.jpg","source":"lazada","status":"found"},
@@ -1943,6 +1943,16 @@ const productImages = {
   "1941":{"name":"SABRINA MINYAK 2L","url":"https://img.lazcdn.com/g/p/82b7f7d02d5983923bc5a14e3b60bbf4.png","source":"lazada","status":"found"},
   "1942":{"name":"SABU SANTAN BUBUK R","url":"https://img.lazcdn.com/g/ff/kf/S4fb823c37bbf4727b517827aa85aceaeO.jpg","source":"lazada","status":"found"},
   "1943":{"name":"SAE TISU BANTAL","url":"https://img.lazcdn.com/g/ff/kf/S753aae8f1ceb4280a8cdf19f398b091dT.jpg","source":"lazada","status":"found"},
+  "1944":{"name":"SAJIKU AYAM GORENG R","url":"https://img.lazcdn.com/g/ff/kf/Sf3e6a7ee523b4bd5bd571ae40a2410e7B.jpg","source":"lazada","status":"found"},
+  "1945":{"name":"SAJIKU GOLDEN CPY 200G","url":"https://img.lazcdn.com/g/p/0ee6181056dbd2c608e520134fb622ae.jpg","source":"lazada","status":"found"},
+  "1946":{"name":"SAJIKU GOLDEN CPY R","url":"https://img.lazcdn.com/g/p/21479f61a692e2d796ca23c9754608f5.jpg","source":"lazada","status":"found"},
+  "1947":{"name":"SAJIKU NASI GORENG AYAM R","url":"https://img.lazcdn.com/g/ff/kf/Sb6666e8f2b894ccfb2b4896dfc4b4a55j.jpg","source":"lazada","status":"found"},
+  "1948":{"name":"SAJIKU NASI GORENG PEDAS R","url":"https://img.lazcdn.com/g/ff/kf/Sb7298212393543f3bbd8b4739c9146a4a.jpg","source":"lazada","status":"found"},
+  "1949":{"name":"SAJIKU SERBAGUNA 200G","url":"https://img.lazcdn.com/g/ff/kf/S083e075772054ab3a59c5986455a6577R.jpg","source":"lazada","status":"found"},
+  "1950":{"name":"SAJIKU TP BAKWAN R","url":"https://img.lazcdn.com/g/p/153d62ba1a3775cdd26b5457c9ec0d29.jpg","source":"lazada","status":"found"},
+  "1951":{"name":"SAJIKU TP PEDAS R","url":"https://img.lazcdn.com/g/p/49a3603a42161465e0953588f9fcd40f.jpg","source":"lazada","status":"found"},
+  "1952":{"name":"SAJIKU TP SERBAGUNA R","url":"https://img.lazcdn.com/g/ot/common/00e53b881a34498896c46cc5ea17360a.webp","source":"lazada","status":"found"},
+  "1953":{"name":"SAKURA MIE GORENG","url":"https://img.lazcdn.com/g/p/79c3a06fa82f8ee18badf11f2cc6af32.jpg","source":"lazada","status":"found"},
 };
 function getProductImage(id){const e=productImages[id];return e&&e.url?e.url:null;}
 function getImageStatus(id){const e=productImages[id];return e?e.status:"missing";}

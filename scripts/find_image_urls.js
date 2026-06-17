@@ -184,10 +184,7 @@ async function findOne(page, product) {
   const { name } = product;
 
   const sources = [
-    { fn: searchLazada,    label: "lazada",    cleanUrl: true },
-    { fn: searchBlibli,    label: "blibli",    cleanUrl: false },
-    { fn: searchShopee,    label: "shopee",    cleanUrl: false },
-    { fn: searchTokopedia, label: "tokopedia", cleanUrl: false },
+    { fn: searchLazada, label: "lazada", cleanUrl: true },
   ];
 
   for (const src of sources) {
@@ -358,6 +355,10 @@ async function main() {
     // Save after every product in batch mode (safety)
     fs.writeFileSync(mp, JSON.stringify(m, null, 2), "utf-8");
     if (fl.length > 0) fs.writeFileSync(fp, JSON.stringify(fl, null, 2), "utf-8");
+    // Regenerate image-mapping.js after every product too, so it's never
+    // out of sync if the process times out (image-mapping.js is what the
+    // website actually reads — _mapping.json is the build artifact).
+    genJs(m);
 
     if (i < prods.length - 1) {
       const jitter = 1000 + Math.floor(Math.random() * CFG.delay);
@@ -366,7 +367,6 @@ async function main() {
   }
 
   await browser.close();
-  genJs(m);
 
   const elapsed = Math.round((Date.now() - startTime) / 1000);
   const breakdown = Object.entries(bySource).map(([k,v]) => `${k}:${v}`).join(" ");
