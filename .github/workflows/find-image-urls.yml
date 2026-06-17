@@ -3,7 +3,7 @@ name: Find Product Image URLs
 on:
   workflow_dispatch:  # Manual trigger
   schedule:
-    - cron: '0 */3 * * *'  # Every 3 hours — 40 products per run
+    - cron: '0 */3 * * *'  # Every 3 hours — 50 products per run
 
 permissions:
   contents: write
