@@ -185,6 +185,7 @@ async function findOne(page, product) {
 
   const sources = [
     { fn: searchLazada, label: "lazada", cleanUrl: true },
+    { fn: searchBlibli, label: "blibli", cleanUrl: false },
   ];
 
   for (const src of sources) {
