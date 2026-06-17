@@ -18,7 +18,7 @@ const { products: allProducts } = require(path.join(__dirname, "..", "products-d
 const CFG = {
   out: path.join(__dirname, "..", "assets", "images"),
   delay: process.env.CI ? 3000 : 1000,
-  batchSize: 50,
+  batchSize: 40,
   mode: process.argv.find(a => a.startsWith("--mode="))?.split("=")[1] || "batch",
 };
 

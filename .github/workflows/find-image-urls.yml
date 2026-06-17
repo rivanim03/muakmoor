@@ -3,7 +3,7 @@ name: Find Product Image URLs
 on:
   workflow_dispatch:  # Manual trigger
   schedule:
-    - cron: '0 */3 * * *'  # Every 3 hours — 50 products per run
+    - cron: '0 */3 * * *'  # Every 3 hours — 40 products per run
 
 permissions:
   contents: write
@@ -11,7 +11,7 @@ permissions:
 jobs:
   find-urls:
     runs-on: ubuntu-latest
-    timeout-minutes: 30  # 50 items @ ~6s each = 5 min, 30 min plenty
+    timeout-minutes: 45  # 40 items @ ~35s each on Tokopedia
 
     steps:
       - name: Checkout repo
@@ -39,9 +39,9 @@ jobs:
           # Playwright browsers as fallback
           npx playwright install --with-deps firefox chromium
 
-      - name: Process next batch (50 products)
+      - name: Process next batch (40 products)
         run: xvfb-run --auto-servernum node scripts/find_image_urls.js --mode=batch
-        timeout-minutes: 25
+        timeout-minutes: 40
         env:
           CI: true
 
