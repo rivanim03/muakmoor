@@ -13456,5 +13456,255 @@
     "url": "https://img.lazcdn.com/g/ff/kf/S0c3c68593d2f4978afc2ff568242ede3B.jpg",
     "source": "lazada",
     "status": "found"
+  },
+  "2244": {
+    "name": "SUKSES SOTO",
+    "url": null,
+    "status": "failed"
+  },
+  "2245": {
+    "name": "SUMPIT MAMBO",
+    "url": null,
+    "status": "failed"
+  },
+  "2246": {
+    "name": "SUMPIT PANDA",
+    "url": null,
+    "status": "failed"
+  },
+  "2247": {
+    "name": "SUN BABY PUFF KEJU",
+    "url": null,
+    "status": "failed"
+  },
+  "2248": {
+    "name": "SUN BABY PUFF STROWBERRY",
+    "url": null,
+    "status": "failed"
+  },
+  "2249": {
+    "name": "SUNBAY EPAVORATED KALENG",
+    "url": null,
+    "status": "failed"
+  },
+  "2250": {
+    "name": "SUNLIGHT 215G",
+    "url": null,
+    "status": "failed"
+  },
+  "2251": {
+    "name": "SUNLIGHT 610G",
+    "url": null,
+    "status": "failed"
+  },
+  "2252": {
+    "name": "SUNLIGHT 640G",
+    "url": null,
+    "status": "failed"
+  },
+  "2253": {
+    "name": "SUNLIGHT 92G",
+    "url": null,
+    "status": "failed"
+  },
+  "2254": {
+    "name": "SUNSILK BOTOL 160G KUNING",
+    "url": null,
+    "status": "failed"
+  },
+  "2255": {
+    "name": "SUNSILK CONTIONER HITAM R",
+    "url": null,
+    "status": "failed"
+  },
+  "2256": {
+    "name": "SUNSILK CONTIONER KUNING R",
+    "url": null,
+    "status": "failed"
+  },
+  "2257": {
+    "name": "SUNSILK HITAM R",
+    "url": null,
+    "status": "failed"
+  },
+  "2258": {
+    "name": "SUNSILK SILKY SMOOTH R",
+    "url": null,
+    "status": "failed"
+  },
+  "2259": {
+    "name": "SUPER BUBUR AYAM ABON",
+    "url": null,
+    "status": "failed"
+  },
+  "2260": {
+    "name": "SUPER BUBUR AYAM R",
+    "url": null,
+    "status": "failed"
+  },
+  "2261": {
+    "name": "SUPER BUBUR AYAM SOTO",
+    "url": null,
+    "status": "failed"
+  },
+  "2262": {
+    "name": "SUPER SOL CEMARA JUMBO R",
+    "url": null,
+    "status": "failed"
+  },
+  "2263": {
+    "name": "SUPER SOL CEMARA R",
+    "url": null,
+    "status": "failed"
+  },
+  "2264": {
+    "name": "SUPER SOL FLORAL MINT R",
+    "url": null,
+    "status": "failed"
+  },
+  "2265": {
+    "name": "SUPER SOL SEREH JUMBO R",
+    "url": null,
+    "status": "failed"
+  },
+  "2266": {
+    "name": "SUPER SOL SEREH R",
+    "url": null,
+    "status": "failed"
+  },
+  "2267": {
+    "name": "SUPERCO R",
+    "url": null,
+    "status": "failed"
+  },
+  "2268": {
+    "name": "SUPERIOR MIE",
+    "url": null,
+    "status": "failed"
+  },
+  "2269": {
+    "name": "SUPERIOR MIE 110G",
+    "url": null,
+    "status": "failed"
+  },
+  "2270": {
+    "name": "SUPERIOR MIE TELOR SPIDER",
+    "url": null,
+    "status": "failed"
+  },
+  "2271": {
+    "name": "SUPERPEL 770ML KOREAN STROW",
+    "url": null,
+    "status": "failed"
+  },
+  "2272": {
+    "name": "SUPERSTAR",
+    "url": null,
+    "status": "failed"
+  },
+  "2273": {
+    "name": "SURYA 12",
+    "url": null,
+    "status": "failed"
+  },
+  "2274": {
+    "name": "SURYA 12 NUSANTARA",
+    "url": null,
+    "status": "failed"
+  },
+  "2275": {
+    "name": "SURYA 16",
+    "url": null,
+    "status": "failed"
+  },
+  "2276": {
+    "name": "SUSU BUBUK",
+    "url": null,
+    "status": "failed"
+  },
+  "2277": {
+    "name": "SUSU PANDA",
+    "url": null,
+    "status": "failed"
+  },
+  "2278": {
+    "name": "SUUK KACANG",
+    "url": null,
+    "status": "failed"
+  },
+  "2279": {
+    "name": "SWALLOW BENING",
+    "url": null,
+    "status": "failed"
+  },
+  "2280": {
+    "name": "SWALLOW COKLAT",
+    "url": null,
+    "status": "failed"
+  },
+  "2281": {
+    "name": "SWALLOW HIJAU",
+    "url": null,
+    "status": "failed"
+  },
+  "2282": {
+    "name": "SWALLOW MERAH",
+    "url": null,
+    "status": "failed"
+  },
+  "2283": {
+    "name": "SWAN SAOS BANTAL",
+    "url": null,
+    "status": "failed"
+  },
+  "2284": {
+    "name": "SWEETY BIRU L R",
+    "url": null,
+    "status": "failed"
+  },
+  "2285": {
+    "name": "SWEETY BIRU M R",
+    "url": null,
+    "status": "failed"
+  },
+  "2286": {
+    "name": "SWEETY BIRU S R",
+    "url": null,
+    "status": "failed"
+  },
+  "2287": {
+    "name": "SWEETY BIRU XL R",
+    "url": null,
+    "status": "failed"
+  },
+  "2288": {
+    "name": "SYSTEMA MENTHOL BREEZE 190G",
+    "url": null,
+    "status": "failed"
+  },
+  "2289": {
+    "name": "TAMARIN PERMEN",
+    "url": null,
+    "status": "failed"
+  },
+  "2290": {
+    "name": "TANAM JAGUNG R",
+    "url": null,
+    "status": "failed"
+  },
+  "2291": {
+    "name": "TANCHO BLACK 6G",
+    "url": null,
+    "status": "failed"
+  },
+  "2292": {
+    "name": "TANGO 100G COKLAT",
+    "url": null,
+    "status": "failed"
+  },
+  "2293": {
+    "name": "TANGO 100G VANILA",
+    "url": null,
+    "status": "failed"
   }
 }
