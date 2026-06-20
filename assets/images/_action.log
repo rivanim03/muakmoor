@@ -38,3 +38,4 @@
 {"timestamp":"2026-06-20T02:47:27.002Z","mode":"batch","attempted":50,"succeeded":50,"failed":0,"sources":{"lazada":50},"totalProgress":2293,"totalProducts":2562}
 {"timestamp":"2026-06-20T07:14:42.608Z","mode":"batch","attempted":50,"succeeded":0,"failed":50,"sources":{},"totalProgress":2293,"totalProducts":2562}
 {"timestamp":"2026-06-20T11:16:53.323Z","mode":"batch","attempted":50,"succeeded":50,"failed":0,"sources":{"lazada":50},"totalProgress":2343,"totalProducts":2562}
+{"timestamp":"2026-06-20T13:51:18.627Z","mode":"batch","attempted":50,"succeeded":50,"failed":0,"sources":{"lazada":50},"totalProgress":2393,"totalProducts":2562}
