@@ -43,3 +43,4 @@
 {"timestamp":"2026-06-20T19:31:41.721Z","mode":"batch","attempted":50,"succeeded":0,"failed":50,"sources":{},"totalProgress":2443,"totalProducts":2562}
 {"timestamp":"2026-06-20T22:08:35.295Z","mode":"batch","attempted":50,"succeeded":50,"failed":0,"sources":{"lazada":50},"totalProgress":2493,"totalProducts":2562}
 {"timestamp":"2026-06-21T03:03:25.409Z","mode":"batch","attempted":50,"succeeded":50,"failed":0,"sources":{"lazada":50},"totalProgress":2543,"totalProducts":2562}
+{"timestamp":"2026-06-21T08:02:40.999Z","mode":"batch","attempted":19,"succeeded":19,"failed":0,"sources":{"lazada":19},"totalProgress":2562,"totalProducts":2562}
